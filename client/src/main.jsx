@@ -2,7 +2,8 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3001", { autoConnect: false });
+const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://127.0.0.1:3001";
+const socket = io(socketUrl, { autoConnect: false });
 
 function App() {
   const [name, setName] = React.useState("Joueur");

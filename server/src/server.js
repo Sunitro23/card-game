@@ -16,10 +16,13 @@ import {
 } from "./game.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
+const HOST = process.env.HOST ?? "127.0.0.1";
 const httpServer = createServer();
 
 const io = new Server(httpServer, {
-  cors: { origin: "*" }
+  cors: {
+    origin: process.env.CLIENT_ORIGIN ?? "http://127.0.0.1:5173"
+  }
 });
 
 function emitRoomState(code) {
@@ -127,6 +130,6 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Socket server ready on :${PORT}`);
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Socket server ready on http://${HOST}:${PORT}`);
 });

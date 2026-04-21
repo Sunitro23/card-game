@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Le serveur écoute par défaut sur `http://localhost:3001`.
+Le serveur écoute par défaut sur `http://127.0.0.1:3001` (loopback uniquement, pas d'exposition réseau externe).
 
 ### Client
 
@@ -28,7 +28,13 @@ npm install
 npm run dev
 ```
 
-Le client Vite écoute en général sur `http://localhost:5173`.
+Le client Vite écoute en général sur `http://127.0.0.1:5173`.
+
+### Variables d'environnement utiles
+
+- `HOST` (serveur) : `127.0.0.1` par défaut
+- `CLIENT_ORIGIN` (serveur) : `http://127.0.0.1:5173` par défaut
+- `VITE_SOCKET_URL` (client) : `http://127.0.0.1:3001` par défaut
 
 ## Flux Socket.IO principal
 
