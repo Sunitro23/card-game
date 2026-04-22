@@ -128,6 +128,22 @@ function startTurn(room) {
   });
 }
 
+function autoSkipTurnIfNoEnergy(room) {
+  if (room.phase !== "combat" || room.pendingAttack) return;
+  const current = getCurrentPlayer(room);
+  if (!current || current.energy > 0) return;
+
+  room.log.push({
+    at: Date.now(),
+    type: "turn_auto_skip",
+    message: `${current.name} n'a plus d'énergie, son tour est passé automatiquement.`
+  });
+
+  room.turnIndex = (room.turnIndex + 1) % room.players.length;
+  room.log.push({ at: Date.now(), type: "turn_end", message: `${current.name} termine son tour.` });
+  startTurn(room);
+}
+
 export function createRoom(hostSocketId, hostName) {
   let code = generateRoomCode();
   while (rooms.has(code)) code = generateRoomCode();
@@ -202,6 +218,7 @@ export function drawCard(code, playerId) {
   const drawn = drawRaw(actor, 1);
   addToHandRespectingLimits(room, actor, drawn);
   room.log.push({ at: Date.now(), type: "draw", message: `${actor.name} pioche (coût 1 énergie).` });
+  autoSkipTurnIfNoEnergy(room);
   return room;
 }
 
@@ -353,6 +370,7 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
     room.log.push({ at: Date.now(), type: "game_finished", message: `${winner} remporte le combat.` });
   }
 
+  autoSkipTurnIfNoEnergy(room);
   return room;
 }
 
