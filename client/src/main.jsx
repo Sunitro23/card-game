@@ -23,6 +23,27 @@ const styles = {
     margin: "0 auto",
     maxWidth: 1060
   },
+  homeCard: {
+    background: "rgba(255,255,255,0.93)",
+    borderRadius: 18,
+    padding: 16,
+    boxShadow: "0 12px 30px rgba(8,8,26,0.2)",
+    display: "grid",
+    gap: 10
+  },
+  lobbyPlayers: {
+    margin: 0,
+    padding: 0,
+    listStyle: "none",
+    display: "grid",
+    gap: 8
+  },
+  lobbyPlayerItem: {
+    borderRadius: 10,
+    background: "rgba(12, 30, 68, 0.1)",
+    padding: "8px 10px",
+    fontWeight: 700
+  },
   lobby: {
     background: "rgba(255,255,255,0.9)",
     borderRadius: 16,
@@ -405,6 +426,8 @@ function App() {
   const pendingAttack = state?.pendingAttack;
   const isMyTurn = Boolean(state && me && state.turnPlayerId === me.id);
   const isMyDefenseTurn = Boolean(pendingAttack && me && pendingAttack.targetId === me.id);
+  const isLobbyPhase = state?.phase === "lobby";
+  const isHost = Boolean(state && me && state.hostPlayerId === me.id);
   const defenseCards = React.useMemo(
     () => me?.hand?.filter((c) => c.type === "defense") ?? [],
     [me]
@@ -517,28 +540,50 @@ function App() {
         }
       `}</style>
       <div style={styles.panel}>
-        <section style={styles.lobby}>
-          <strong>Card Game MVP</strong>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
-          <button onClick={handleCreateRoom}>Créer</button>
-          <input
-            value={code}
-            placeholder="Code room"
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-          />
-          <button onClick={handleJoinRoom}>Rejoindre</button>
-          {state && (
-            <>
-              <button onClick={handleStartGame}>Démarrer</button>
-              <span>
-                Room <strong>{state.code}</strong> - {state.phase}
-              </span>
-              <span style={styles.turnBox}>{isMyTurn ? "✅ Ton tour" : "⏳ Tour adverse"}</span>
-            </>
-          )}
-        </section>
+        {!state && (
+          <section style={styles.homeCard}>
+            <strong style={{ fontSize: 20 }}>Card Game MVP</strong>
+            <span>Crée une room ou rejoins une room existante.</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={handleCreateRoom}>Créer une room</button>
+              <input
+                value={code}
+                placeholder="Code room"
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+              />
+              <button onClick={handleJoinRoom}>Rejoindre</button>
+            </div>
+          </section>
+        )}
 
-        {state && (
+        {state && isLobbyPhase && (
+          <section style={styles.homeCard}>
+            <strong style={{ fontSize: 20 }}>Lobby</strong>
+            <p style={{ margin: 0 }}>
+              Room <strong>{state.code}</strong> · En attente des joueurs.
+            </p>
+            <ul style={styles.lobbyPlayers}>
+              {state.players.map((player) => (
+                <li key={player.id} style={styles.lobbyPlayerItem}>
+                  {player.name} {player.id === state.hostPlayerId ? "(hôte)" : ""}
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {isHost ? (
+                <button onClick={handleStartGame} disabled={state.players.length < 2}>
+                  Démarrer
+                </button>
+              ) : (
+                <span>Seul l'hôte peut lancer la partie.</span>
+              )}
+              {state.players.length < 2 && <span>Il faut 2 joueurs pour démarrer.</span>}
+            </div>
+          </section>
+        )}
+
+        {state && !isLobbyPhase && (
           <section style={{ ...styles.board, minHeight: isMobile ? 380 : styles.board.minHeight, padding: isMobile ? 10 : styles.board.padding }}>
             <div>
               {opponents[0] ? (
@@ -688,7 +733,7 @@ function App() {
           </section>
         )}
 
-        {state && (
+        {state && !isLobbyPhase && (
           <section style={styles.controls}>
             <div>
               <strong>Actions de tour</strong>
@@ -718,7 +763,7 @@ function App() {
           </section>
         )}
 
-        {state && (
+        {state && !isLobbyPhase && (
           <section style={styles.log}>
             <strong>Journal</strong>
             <ul>
@@ -729,7 +774,7 @@ function App() {
           </section>
         )}
 
-        {isMyDefenseTurn && (
+        {!isLobbyPhase && isMyDefenseTurn && (
           <div style={styles.modalBackdrop}>
             <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding, animation: "defense-pop 220ms ease-out" }}>
               <h3 style={{ margin: 0 }}>🛡 Défense requise</h3>
