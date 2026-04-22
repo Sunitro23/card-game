@@ -488,44 +488,41 @@ function App() {
                   </div>
                   <div style={styles.opponentHand}>
                     {Array.from({ length: opponents[0].handCount }).map((_, index) => (
-                      <div key={`opponent-card-${index}`} style={styles.cardBack}>
-                        UNO
-                      </div>
+                      (() => {
+                        const revealedCard = previewCardFromVision(state.opponentDeckPreview?.[index]);
+                        const palette = revealedCard ? cardPalette(revealedCard) : null;
+                        return (
+                          <div
+                            key={`opponent-card-${index}`}
+                            style={
+                              revealedCard
+                                ? {
+                                    ...styles.cardBack,
+                                    width: isMobile ? 58 : 64,
+                                    height: isMobile ? 84 : 90,
+                                    background: palette.bg,
+                                    flexDirection: "column",
+                                    gap: 3,
+                                    fontSize: 11
+                                  }
+                                : styles.cardBack
+                            }
+                          >
+                            {revealedCard ? (
+                              <>
+                                <span style={{ fontSize: 20, lineHeight: 1 }}>{palette.icon}</span>
+                                <span style={{ fontSize: 9, textAlign: "center", padding: "0 3px" }}>
+                                  {cardLabel(revealedCard)}
+                                </span>
+                              </>
+                            ) : (
+                              "UNO"
+                            )}
+                          </div>
+                        );
+                      })()
                     ))}
                   </div>
-                  {state.opponentDeckPreview && (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ ...styles.small, fontWeight: 700, marginBottom: 6 }}>Vision: cartes ennemies révélées</div>
-                      <div style={{ ...styles.modalCards, justifyContent: "flex-start", gap: 6 }}>
-                        {state.opponentDeckPreview.map((rawCard, index) => {
-                          const card = previewCardFromVision(rawCard);
-                          if (!card) return null;
-                          const palette = cardPalette(card);
-                          return (
-                            <div
-                              key={`vision-${rawCard}-${index}`}
-                              style={{
-                                ...styles.cardButton,
-                                background: palette.bg,
-                                width: isMobile ? 78 : 90,
-                                minHeight: isMobile ? 98 : 108,
-                                cursor: "default",
-                                boxShadow: "0 8px 12px rgba(16, 24, 46, 0.32)",
-                                padding: 6
-                              }}
-                            >
-                              <div style={{ ...styles.cardHeader, fontSize: 10 }}>
-                                <span>{card.type === "defense" ? "DEF" : "UTIL"}</span>
-                                <span>{palette.icon}</span>
-                              </div>
-                              <div style={{ ...styles.cardMain, fontSize: 20 }}>{palette.icon}</div>
-                              <div style={{ ...styles.cardSub, fontSize: 10 }}>{cardLabel(card)}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : (
                 <div style={styles.playerBadge}>En attente d'un adversaire...</div>
@@ -550,9 +547,11 @@ function App() {
                   <div style={{ fontSize: 13 }}>Pioche</div>
                   <div style={{ fontSize: 11, opacity: 0.9 }}>1 énergie</div>
                 </button>
-                <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
-                  {pendingAttack ? `${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}` : "Aucune attaque"}
-                </div>
+                {pendingAttack && (
+                  <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
+                    {`${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}`}
+                  </div>
+                )}
               </div>
             </div>
 
