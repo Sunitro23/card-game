@@ -4,7 +4,6 @@ import {
   createRoom,
   endTurn,
   getVisibleState,
-  guessBluff,
   joinRoom,
   leaveBySocket,
   mulligan,
@@ -16,20 +15,13 @@ import {
 } from "./game.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
-
-// Si nginx/traefik est sur la MÊME machine et proxy_pass vers localhost:3001,
-// tu peux garder 127.0.0.1.
-// Si tu veux exposer directement le process Node, mets "0.0.0.0".
 const HOST = process.env.HOST ?? "0.0.0.0";
 
 const httpServer = createServer();
 
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      "https://owlbear.sunitro.de",
-      "http://localhost:5173"
-    ],
+    origin: ["https://owlbear.sunitro.de", "http://localhost:5173"],
     methods: ["GET", "POST"]
   }
 });
@@ -98,17 +90,6 @@ io.on("connection", (socket) => {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
       resolveDefense(ref.code, ref.playerId, defenseCardId);
-      emitRoomState(ref.code);
-    } catch (err) {
-      onError(socket, err);
-    }
-  });
-
-  socket.on("combat:bluff:guess", ({ guess }) => {
-    try {
-      const ref = playersBySocketId.get(socket.id);
-      if (!ref) throw new Error("Joueur inconnu.");
-      guessBluff(ref.code, ref.playerId, guess);
       emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);

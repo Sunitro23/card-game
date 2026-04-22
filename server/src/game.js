@@ -67,8 +67,6 @@ export function createRoom(hostSocketId, hostName) {
         stats: makeStats(),
         hp: 30,
         mana: 0,
-        bluffUsesMax: 2,
-        bluffUsesLeft: 2,
         usedUltimate: false,
         mulliganUsedTurn: false,
         hand: [],
@@ -103,8 +101,6 @@ export function joinRoom(code, socketId, playerName) {
     stats: makeStats(),
     hp: 30,
     mana: 0,
-    bluffUsesMax: 2,
-    bluffUsesLeft: 2,
     usedUltimate: false,
     mulliganUsedTurn: false,
     hand: [],
@@ -142,12 +138,12 @@ export function startGame(code) {
   room.players.forEach((p) => {
     draw(p, 5);
     p.mulliganUsedTurn = false;
-    p.bluffUsesLeft = p.bluffUsesMax;
     p.usedUltimate = false;
     p.status.counterImmune = false;
   });
 
   room.log.push({ at: Date.now(), type: "game_started", message: "Combat lancé." });
+  room.log.push({ at: Date.now(), type: "turn_started", message: `Tour de ${getCurrentPlayer(room).name}.` });
   return room;
 }
 
@@ -165,10 +161,11 @@ function removeCardFromHand(player, cardId) {
   return player.hand.splice(idx, 1)[0];
 }
 
-export function playCard(code, playerId, { cardId, targetPlayerId, facedown = false }) {
+export function playCard(code, playerId, { cardId, targetPlayerId }) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
   if (room.phase !== "combat") throw new Error("Le combat n'a pas commencé.");
+  if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
 
   const actor = room.players.find((p) => p.id === playerId);
   const turnPlayer = getCurrentPlayer(room);
@@ -177,28 +174,6 @@ export function playCard(code, playerId, { cardId, targetPlayerId, facedown = fa
   const card = removeCardFromHand(actor, cardId);
   const target = room.players.find((p) => p.id === targetPlayerId) ?? getOpponent(room, actor.id);
   if (!target) throw new Error("Aucune cible.");
-
-  const canBluff = facedown && actor.bluffUsesLeft > 0;
-  if (facedown && !canBluff) throw new Error("Bluff indisponible.");
-
-  if (canBluff) {
-    actor.bluffUsesLeft -= 1;
-    room.pendingAttack = {
-      id: uid("attack"),
-      attackerId: actor.id,
-      targetId: target.id,
-      card,
-      facedown: true,
-      declaredType: "hidden"
-    };
-
-    room.log.push({
-      at: Date.now(),
-      type: "attack_declared",
-      message: `${actor.name} joue une carte face cachée contre ${target.name}.`
-    });
-    return room;
-  }
 
   if (card.type === "mana") {
     actor.mana += card.mana;
@@ -213,8 +188,7 @@ export function playCard(code, playerId, { cardId, targetPlayerId, facedown = fa
       attackerId: actor.id,
       targetId: target.id,
       card,
-      facedown: false,
-      declaredType: "attack"
+      facedown: false
     };
 
     room.log.push({
@@ -277,18 +251,6 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
     if (defenseCard.type !== "defense") throw new Error("La carte n'est pas défensive.");
   }
 
-  if (attack.card.type !== "attack") {
-    attacker.discard.push(attack.card);
-    if (defenseCard) defender.discard.push(defenseCard);
-    room.pendingAttack = null;
-    room.log.push({
-      at: Date.now(),
-      type: "bluff_resolved",
-      message: `${attacker.name} bluffait avec une carte ${attack.card.type}. Aucun dégât infligé.`
-    });
-    return room;
-  }
-
   const attackRoll = rollDie() + attack.card.rollMod;
   const statBonus = attacker.stats[attack.card.stat] ?? 0;
   let damage = attack.card.baseDamage + statBonus + attackRoll;
@@ -332,24 +294,6 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   return room;
 }
 
-export function guessBluff(code, defenderId, guess) {
-  const room = rooms.get(code);
-  const attack = room?.pendingAttack;
-  if (!room || !attack || !attack.facedown) throw new Error("Aucun bluff en attente.");
-  if (attack.targetId !== defenderId) throw new Error("Pas votre décision.");
-
-  const isAttack = attack.card.type === "attack";
-  const guessedRight = (guess === "attack" && isAttack) || (guess === "other" && !isAttack);
-
-  room.log.push({
-    at: Date.now(),
-    type: "bluff_guess",
-    message: guessedRight ? "Bluff deviné correctement." : "Mauvaise lecture du bluff."
-  });
-
-  return { room, guessedRight };
-}
-
 export function mulligan(code, playerId, cardIds = []) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
@@ -357,6 +301,7 @@ export function mulligan(code, playerId, cardIds = []) {
   const player = room.players.find((p) => p.id === playerId);
   const current = getCurrentPlayer(room);
   if (!player || current.id !== player.id) throw new Error("Action invalide.");
+  if (room.pendingAttack) throw new Error("Impossible pendant une défense en attente.");
   if (player.mulliganUsedTurn) throw new Error("Mulligan déjà utilisé ce tour.");
 
   const selected = new Set(cardIds);
@@ -385,6 +330,7 @@ export function mulligan(code, playerId, cardIds = []) {
 export function endTurn(code, playerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
+  if (room.pendingAttack) throw new Error("Résolvez l'attaque avant de finir le tour.");
 
   const current = getCurrentPlayer(room);
   if (current.id !== playerId) throw new Error("Ce n'est pas votre tour.");
@@ -400,6 +346,7 @@ export function endTurn(code, playerId) {
     type: "turn_end",
     message: `${current.name} termine son tour (${sagSuccess ? "+1 pioche SAG" : "pioche normale"}).`
   });
+  room.log.push({ at: Date.now(), type: "turn_started", message: `Tour de ${getCurrentPlayer(room).name}.` });
 
   return room;
 }
@@ -414,10 +361,8 @@ export function getVisibleState(room, playerId) {
           id: room.pendingAttack.id,
           attackerId: room.pendingAttack.attackerId,
           targetId: room.pendingAttack.targetId,
-          facedown: room.pendingAttack.facedown,
-          card: room.pendingAttack.facedown && room.pendingAttack.targetId !== playerId
-            ? { id: "hidden", type: "unknown" }
-            : room.pendingAttack.card
+          facedown: false,
+          card: room.pendingAttack.card
         }
       : null,
     players: room.players.map((p) => ({
@@ -428,7 +373,6 @@ export function getVisibleState(room, playerId) {
       position: p.position,
       handCount: p.hand.length,
       hand: p.id === playerId ? p.hand : undefined,
-      bluffUsesLeft: p.id === playerId ? p.bluffUsesLeft : undefined,
       usedUltimate: p.usedUltimate,
       stats: p.stats
     })),

@@ -2,66 +2,67 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 
-const socketUrl =
-  import.meta.env.VITE_SOCKET_URL ?? "https://owlbearapi.sunitro.de";
+const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "https://owlbearapi.sunitro.de";
 
 const socket = io(socketUrl, {
   autoConnect: false,
   path: "/socket.io/",
-  transports: ["websocket", "polling"],
+  transports: ["websocket", "polling"]
 });
 
 const styles = {
   page: {
     minHeight: "100vh",
-    padding: 16,
+    padding: 12,
     fontFamily: "Inter, system-ui, sans-serif",
     background: "#13c75b",
     color: "#0d1021",
-    boxSizing: "border-box",
+    boxSizing: "border-box"
   },
   panel: {
     margin: "0 auto",
-    maxWidth: 1200,
+    maxWidth: 1000
   },
   lobby: {
-    background: "rgba(255,255,255,0.85)",
+    background: "rgba(255,255,255,0.9)",
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: 10,
+    marginBottom: 10,
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: 8,
+    gap: 8
   },
   board: {
-    position: "relative",
-    borderRadius: 24,
-    minHeight: 560,
+    borderRadius: 18,
+    minHeight: 420,
     background: "radial-gradient(circle at center, #2fd46f 0%, #13c75b 52%, #10b752 100%)",
-    boxShadow: "inset 0 0 0 4px rgba(255,255,255,0.2)",
-    padding: 16,
-    overflow: "hidden",
+    boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.2)",
+    padding: 12,
+    display: "grid",
+    gridTemplateRows: "auto auto auto",
+    gap: 12
+  },
+  centerArena: {
+    display: "flex",
+    justifyContent: "center"
   },
   arenaCard: {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    transform: "translate(-50%, -50%)",
     background: "#d31936",
-    borderRadius: 16,
-    width: 280,
-    height: 160,
-    boxShadow: "0 8px 0 #8c0f23",
+    borderRadius: 12,
+    width: "min(100%, 280px)",
+    minHeight: 110,
+    boxShadow: "0 6px 0 #8c0f23",
     display: "flex",
-    gap: 16,
+    gap: 12,
     justifyContent: "center",
     alignItems: "center",
+    padding: 10
   },
   arenaSlot: {
-    border: "4px solid #f4f4f4",
-    width: 76,
-    height: 112,
+    border: "3px solid #f4f4f4",
+    width: 74,
+    height: 90,
     borderRadius: 10,
     background: "#10111a",
     color: "#f4f4f4",
@@ -69,21 +70,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontWeight: 700,
-  },
-  playerTop: {
-    position: "absolute",
-    top: 16,
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "85%",
-    textAlign: "center",
-  },
-  playerBottom: {
-    position: "absolute",
-    bottom: 16,
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "95%",
+    fontSize: 12,
+    textAlign: "center"
   },
   playerBadge: {
     display: "inline-flex",
@@ -93,78 +81,78 @@ const styles = {
     background: "rgba(10,20,40,0.8)",
     color: "#fff",
     padding: "6px 12px",
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: 13,
+    marginBottom: 8
   },
   handRow: {
-    display: "flex",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 8,
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+    gap: 8
   },
   opponentHand: {
     display: "flex",
     justifyContent: "center",
+    flexWrap: "wrap",
     gap: 6,
-    minHeight: 120,
+    minHeight: 60
   },
   cardBack: {
-    width: 72,
-    height: 104,
-    borderRadius: 10,
-    border: "4px solid #f1f1f1",
+    width: 48,
+    height: 68,
+    borderRadius: 8,
+    border: "3px solid #f1f1f1",
     background: "#10111a",
     color: "#ffcc00",
     fontWeight: 900,
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    transform: "rotate(-3deg)",
+    justifyContent: "center"
   },
   myCard: {
-    width: 120,
     borderRadius: 12,
     border: "3px solid #fff",
     background: "#f8f8f8",
     boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-    padding: 8,
+    padding: 8
   },
   myCardTitle: {
     fontSize: 13,
     fontWeight: 700,
-    minHeight: 34,
+    minHeight: 34
   },
   small: {
     fontSize: 12,
-    opacity: 0.8,
+    opacity: 0.8
   },
   controls: {
-    marginTop: 12,
-    padding: 12,
+    marginTop: 10,
+    padding: 10,
     borderRadius: 12,
     background: "rgba(255,255,255,0.88)",
     display: "grid",
-    gap: 10,
+    gap: 10
   },
   log: {
-    marginTop: 12,
+    marginTop: 10,
     maxHeight: 180,
     overflow: "auto",
     borderRadius: 12,
     background: "rgba(8, 18, 28, 0.8)",
     color: "#fff",
     padding: 10,
-    fontSize: 13,
+    fontSize: 13
   },
+  turnBox: {
+    marginLeft: "auto",
+    fontWeight: 700
+  }
 };
 
 function cardLabel(card) {
-  if (card.type === "attack") {
-    return `ATK ${card.stat}`;
-  }
+  if (card.type === "attack") return `ATK ${card.stat}`;
   if (card.type === "defense") return `DEF ${card.defense}`;
   if (card.type === "mana") return `MANA +${card.mana}`;
-  if (card.type === "skill") return `ULTIME`;
+  if (card.type === "skill") return "ULTIME";
   if (card.type === "utility") return `UTIL ${card.utility}`;
   return card.type;
 }
@@ -182,8 +170,6 @@ function App() {
   const [code, setCode] = React.useState("");
   const [state, setState] = React.useState(null);
   const [error, setError] = React.useState("");
-  const [facedownByCard, setFacedownByCard] = React.useState({});
-  const [guess, setGuess] = React.useState("attack");
 
   React.useEffect(() => {
     const onRoomState = (nextState) => {
@@ -215,6 +201,7 @@ function App() {
   }, [state, me]);
 
   const pendingAttack = state?.pendingAttack;
+  const isMyTurn = Boolean(state && me && state.turnPlayerId === me.id);
   const isMyDefenseTurn = Boolean(pendingAttack && me && pendingAttack.targetId === me.id);
   const defenseCards = me?.hand?.filter((c) => c.type === "defense") ?? [];
 
@@ -233,7 +220,7 @@ function App() {
     setError("");
     socket.emit("room:join", {
       code: code.trim().toUpperCase(),
-      playerName: name.trim() || "Joueur",
+      playerName: name.trim() || "Joueur"
     });
   }
 
@@ -247,15 +234,7 @@ function App() {
   }
 
   function playCard(cardId, targetPlayerId) {
-    socket.emit("card:play", {
-      cardId,
-      targetPlayerId,
-      facedown: Boolean(facedownByCard[cardId]),
-    });
-  }
-
-  function toggleFacedown(cardId) {
-    setFacedownByCard((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
+    socket.emit("card:play", { cardId, targetPlayerId });
   }
 
   function defend(defenseCardId) {
@@ -264,10 +243,6 @@ function App() {
 
   function defendWithoutCard() {
     socket.emit("combat:defend", {});
-  }
-
-  function sendGuess() {
-    socket.emit("combat:bluff:guess", { guess });
   }
 
   function useMulligan() {
@@ -292,17 +267,20 @@ function App() {
           {state && (
             <>
               <button onClick={handleStartGame}>Démarrer</button>
-              <button onClick={handleEndTurn}>Fin de tour</button>
+              <button onClick={handleEndTurn} disabled={!isMyTurn || Boolean(pendingAttack)}>
+                Fin de tour
+              </button>
               <span>
                 Room <strong>{state.code}</strong> - {state.phase}
               </span>
+              <span style={styles.turnBox}>{isMyTurn ? "✅ Ton tour" : "⏳ Tour adverse"}</span>
             </>
           )}
         </section>
 
         {state && (
           <section style={styles.board}>
-            <div style={styles.playerTop}>
+            <div>
               {opponents[0] ? (
                 <>
                   <div style={styles.playerBadge}>
@@ -321,39 +299,27 @@ function App() {
               )}
             </div>
 
-            <div style={styles.arenaCard}>
-              <div style={styles.arenaSlot}>PIOCHE</div>
-              <div style={styles.arenaSlot}>
-                {pendingAttack
-                  ? pendingAttack.facedown
-                    ? "?"
-                    : cardLabel(pendingAttack.card)
-                  : "VIDE"}
+            <div style={styles.centerArena}>
+              <div style={styles.arenaCard}>
+                <div style={styles.arenaSlot}>PIOCHE</div>
+                <div style={styles.arenaSlot}>{pendingAttack ? cardLabel(pendingAttack.card) : "VIDE"}</div>
               </div>
             </div>
 
             {me && (
-              <div style={styles.playerBottom}>
+              <div>
                 <div style={styles.playerBadge}>
-                  {me.name} · HP {me.hp} · Mana {me.mana} · Bluffs {me.bluffUsesLeft ?? 0}
+                  {me.name} · HP {me.hp} · Mana {me.mana}
                 </div>
                 <div style={styles.handRow}>
                   {me.hand.map((card) => (
                     <div key={card.id} style={styles.myCard}>
                       <div style={styles.myCardTitle}>{cardLabel(card)}</div>
                       <div style={styles.small}>{cardDetails(card)}</div>
-                      <label style={styles.small}>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(facedownByCard[card.id])}
-                          onChange={() => toggleFacedown(card.id)}
-                        />{" "}
-                        Face cachée
-                      </label>
                       <div>
                         <button
                           onClick={() => playCard(card.id, opponents[0]?.id)}
-                          disabled={!opponents[0]}
+                          disabled={!opponents[0] || !isMyTurn || Boolean(pendingAttack)}
                         >
                           Jouer
                         </button>
@@ -371,7 +337,7 @@ function App() {
             <div>
               <strong>Actions de tour</strong>
               <div>
-                <button onClick={useMulligan} disabled={!me?.hand?.length}>
+                <button onClick={useMulligan} disabled={!isMyTurn || !me?.hand?.length || Boolean(pendingAttack)}>
                   Mulligan auto (2)
                 </button>
               </div>
@@ -388,18 +354,6 @@ function App() {
                   ))}
                   <button onClick={defendWithoutCard}>Aucune défense</button>
                 </div>
-
-                {pendingAttack?.facedown && (
-                  <div style={{ marginTop: 6 }}>
-                    <select value={guess} onChange={(e) => setGuess(e.target.value)}>
-                      <option value="attack">C'est une attaque</option>
-                      <option value="other">Ce n'est pas une attaque</option>
-                    </select>
-                    <button onClick={sendGuess} style={{ marginLeft: 6 }}>
-                      Deviner
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </section>
