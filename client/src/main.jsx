@@ -50,7 +50,7 @@ const styles = {
   arenaCard: {
     background: "#d31936",
     borderRadius: 12,
-    width: "min(100%, 280px)",
+    width: "min(100%, 360px)",
     minHeight: 110,
     boxShadow: "0 6px 0 #8c0f23",
     display: "flex",
@@ -61,7 +61,7 @@ const styles = {
   },
   arenaSlot: {
     border: "3px solid #f4f4f4",
-    width: 74,
+    width: 110,
     height: 90,
     borderRadius: 10,
     background: "#10111a",
@@ -71,7 +71,8 @@ const styles = {
     justifyContent: "center",
     fontWeight: 700,
     fontSize: 12,
-    textAlign: "center"
+    textAlign: "center",
+    padding: 4
   },
   playerBadge: {
     display: "inline-flex",
@@ -149,19 +150,13 @@ const styles = {
 };
 
 function cardLabel(card) {
-  if (card.type === "attack") return `ATK ${card.stat}`;
   if (card.type === "defense") return `DEF ${card.defense}`;
-  if (card.type === "mana") return `MANA +${card.mana}`;
-  if (card.type === "skill") return "ULTIME";
   if (card.type === "utility") return `UTIL ${card.utility}`;
   return card.type;
 }
 
 function cardDetails(card) {
-  if (card.type === "attack") {
-    return `${card.baseDamage} + dé +${card.rollMod}${card.range === "proximity" ? " (mêlée)" : ""}`;
-  }
-  if (card.type === "skill") return `${card.manaCost} mana`;
+  if (card.type === "defense" && card.value) return `Réduction: ${card.value}`;
   return "";
 }
 
@@ -237,18 +232,20 @@ function App() {
     socket.emit("card:play", { cardId, targetPlayerId });
   }
 
+  function attack(attackType) {
+    socket.emit("combat:attack", { attackType, targetPlayerId: opponents[0]?.id });
+  }
+
+  function drawCard() {
+    socket.emit("turn:draw");
+  }
+
   function defend(defenseCardId) {
     socket.emit("combat:defend", { defenseCardId });
   }
 
   function defendWithoutCard() {
     socket.emit("combat:defend", {});
-  }
-
-  function useMulligan() {
-    if (!me?.hand?.length) return;
-    const ids = me.hand.slice(0, Math.min(2, me.hand.length)).map((c) => c.id);
-    socket.emit("hand:mulligan", { cardIds: ids });
   }
 
   return (
@@ -284,7 +281,7 @@ function App() {
               {opponents[0] ? (
                 <>
                   <div style={styles.playerBadge}>
-                    {opponents[0].name} · HP {opponents[0].hp} · Mana {opponents[0].mana} · {opponents[0].handCount} cartes
+                    {opponents[0].name} · HP {opponents[0].hp} · Énergie {opponents[0].energy}/{state.config.maxEnergy} · {opponents[0].handCount} cartes
                   </div>
                   <div style={styles.opponentHand}>
                     {Array.from({ length: opponents[0].handCount }).map((_, index) => (
@@ -293,6 +290,9 @@ function App() {
                       </div>
                     ))}
                   </div>
+                  {state.opponentDeckPreview && (
+                    <div style={styles.small}>Deck adverse visible: {state.opponentDeckPreview.join(", ")}</div>
+                  )}
                 </>
               ) : (
                 <div style={styles.playerBadge}>En attente d'un adversaire...</div>
@@ -301,29 +301,31 @@ function App() {
 
             <div style={styles.centerArena}>
               <div style={styles.arenaCard}>
-                <div style={styles.arenaSlot}>PIOCHE</div>
-                <div style={styles.arenaSlot}>{pendingAttack ? cardLabel(pendingAttack.card) : "VIDE"}</div>
+                <div style={styles.arenaSlot}>Pioche util/def (1 énergie)</div>
+                <div style={styles.arenaSlot}>{pendingAttack ? pendingAttack.card.label : "Aucune attaque"}</div>
               </div>
             </div>
 
             {me && (
               <div>
                 <div style={styles.playerBadge}>
-                  {me.name} · HP {me.hp} · Mana {me.mana}
+                  {me.name} · HP {me.hp} · Énergie {me.energy}/{state.config.maxEnergy}
                 </div>
                 <div style={styles.handRow}>
                   {me.hand.map((card) => (
                     <div key={card.id} style={styles.myCard}>
                       <div style={styles.myCardTitle}>{cardLabel(card)}</div>
                       <div style={styles.small}>{cardDetails(card)}</div>
-                      <div>
-                        <button
-                          onClick={() => playCard(card.id, opponents[0]?.id)}
-                          disabled={!opponents[0] || !isMyTurn || Boolean(pendingAttack)}
-                        >
-                          Jouer
-                        </button>
-                      </div>
+                      {card.type === "utility" && (
+                        <div>
+                          <button
+                            onClick={() => playCard(card.id, opponents[0]?.id)}
+                            disabled={!opponents[0] || !isMyTurn || Boolean(pendingAttack)}
+                          >
+                            Utiliser
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -336,9 +338,18 @@ function App() {
           <section style={styles.controls}>
             <div>
               <strong>Actions de tour</strong>
-              <div>
-                <button onClick={useMulligan} disabled={!isMyTurn || !me?.hand?.length || Boolean(pendingAttack)}>
-                  Mulligan auto (2)
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                <button onClick={() => attack("ranged")} disabled={!isMyTurn || Boolean(pendingAttack)}>
+                  Attaque distance (D4)
+                </button>
+                <button onClick={() => attack("magic")} disabled={!isMyTurn || Boolean(pendingAttack)}>
+                  Attaque magique (D6)
+                </button>
+                <button onClick={() => attack("melee")} disabled={!isMyTurn || Boolean(pendingAttack)}>
+                  Attaque mêlée (D8)
+                </button>
+                <button onClick={drawCard} disabled={!isMyTurn || Boolean(pendingAttack)}>
+                  Piocher (1 énergie)
                 </button>
               </div>
             </div>

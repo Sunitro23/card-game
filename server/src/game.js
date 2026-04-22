@@ -1,6 +1,17 @@
 import crypto from "node:crypto";
 
 const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const MAX_ENERGY = 6;
+const ENERGY_PER_TURN = 2;
+const STARTING_HP = 30;
+const MAX_HAND_SIZE = 5;
+const MAX_DEFENSE_IN_HAND = 2;
+
+const ATTACKS = {
+  ranged: { type: "ranged", label: "Attaque à distance", dieSides: 4 },
+  magic: { type: "magic", label: "Attaque magique", dieSides: 6 },
+  melee: { type: "melee", label: "Attaque de mêlée", dieSides: 8 }
+};
 
 export const rooms = new Map();
 export const playersBySocketId = new Map();
@@ -23,128 +34,68 @@ function generateRoomCode() {
 
 function createDeck() {
   const cards = [
-    { id: uid("atk"), type: "attack", stat: "FOR", baseDamage: 5, range: "proximity", rollMod: 2 },
-    { id: uid("atk"), type: "attack", stat: "FOR", baseDamage: 4, range: "proximity", rollMod: 1 },
-    { id: uid("atk"), type: "attack", stat: "DEX", baseDamage: 4, range: "distance", rollMod: 3 },
-    { id: uid("atk"), type: "attack", stat: "DEX", baseDamage: 3, range: "distance", rollMod: 2 },
-    { id: uid("atk"), type: "attack", stat: "INT", baseDamage: 4, range: "distance", rollMod: 2 },
-    { id: uid("atk"), type: "attack", stat: "INT", baseDamage: 3, range: "distance", rollMod: 3 },
-    { id: uid("def"), type: "defense", defense: "block", value: 4 },
-    { id: uid("def"), type: "defense", defense: "dodge", value: 999 },
-    { id: uid("def"), type: "defense", defense: "counter", value: 0 },
+    { id: uid("def"), type: "defense", defense: "dodge" },
+    { id: uid("def"), type: "defense", defense: "block", value: 3 },
+    { id: uid("def"), type: "defense", defense: "counter_melee" },
+    { id: uid("def"), type: "defense", defense: "counter_magic" },
     { id: uid("util"), type: "utility", utility: "vision" },
-    { id: uid("util"), type: "utility", utility: "steal" },
     { id: uid("util"), type: "utility", utility: "critical" },
-    { id: uid("util"), type: "utility", utility: "move", value: 2 },
-    { id: uid("skill"), type: "skill", skill: "counter_immunity", manaCost: 5 },
-    { id: uid("mana"), type: "mana", mana: 1 },
-    { id: uid("mana"), type: "mana", mana: 1 },
-    { id: uid("mana"), type: "mana", mana: 1 }
+    { id: uid("util"), type: "utility", utility: "steal" },
+    { id: uid("def"), type: "defense", defense: "block", value: 2 },
+    { id: uid("util"), type: "utility", utility: "critical" }
   ];
 
   return cards.sort(() => Math.random() - 0.5);
 }
 
-function makeStats() {
-  return { VIT: 30, FOR: 3, DEX: 3, INT: 3, SAG: 2, CHA: 2 };
-}
-
-export function createRoom(hostSocketId, hostName) {
-  let code = generateRoomCode();
-  while (rooms.has(code)) code = generateRoomCode();
-
-  const hostPlayerId = uid("p");
-  const room = {
-    code,
-    phase: "lobby",
-    createdAt: Date.now(),
-    turnIndex: 0,
-    players: [
-      {
-        id: hostPlayerId,
-        socketId: hostSocketId,
-        name: hostName,
-        stats: makeStats(),
-        hp: 30,
-        mana: 0,
-        usedUltimate: false,
-        mulliganUsedTurn: false,
-        hand: [],
-        deck: createDeck(),
-        discard: [],
-        position: 0,
-        status: { counterImmune: false }
-      }
-    ],
-    log: [
-      { at: Date.now(), type: "room_created", message: `${hostName} a créé la partie ${code}.` }
-    ],
-    pendingAttack: null
-  };
-
-  rooms.set(code, room);
-  playersBySocketId.set(hostSocketId, { code, playerId: hostPlayerId });
-  return room;
-}
-
-export function joinRoom(code, socketId, playerName) {
-  const room = rooms.get(code);
-  if (!room) throw new Error("Room introuvable.");
-  if (room.phase !== "lobby") throw new Error("Partie déjà démarrée.");
-  if (room.players.length >= 2) throw new Error("La room est pleine.");
-
-  const playerId = uid("p");
-  room.players.push({
-    id: playerId,
+function makePlayer(socketId, name, position) {
+  return {
+    id: uid("p"),
     socketId,
-    name: playerName,
-    stats: makeStats(),
-    hp: 30,
-    mana: 0,
-    usedUltimate: false,
-    mulliganUsedTurn: false,
+    name,
+    hp: STARTING_HP,
+    energy: 0,
     hand: [],
     deck: createDeck(),
     discard: [],
-    position: 2,
-    status: { counterImmune: false }
-  });
-  playersBySocketId.set(socketId, { code, playerId });
-  room.log.push({ at: Date.now(), type: "player_joined", message: `${playerName} a rejoint.` });
-
-  return room;
+    position,
+    status: { nextCritical: false, visionActive: false }
+  };
 }
 
-function draw(player, count = 1) {
+function drawRaw(player, count = 1) {
+  const drawn = [];
   for (let i = 0; i < count; i += 1) {
     if (!player.deck.length) {
       player.deck = player.discard.sort(() => Math.random() - 0.5);
       player.discard = [];
       if (!player.deck.length) break;
     }
-    player.hand.push(player.deck.pop());
+    const card = player.deck.pop();
+    drawn.push(card);
   }
+  return drawn;
 }
 
-export function startGame(code) {
-  const room = rooms.get(code);
-  if (!room) throw new Error("Room introuvable.");
-  if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour démarrer.");
+function addToHandRespectingLimits(room, player, cards) {
+  for (const card of cards) {
+    if (player.hand.length >= MAX_HAND_SIZE) {
+      player.discard.push(card);
+      room.log.push({ at: Date.now(), type: "hand_full", message: `${player.name} a la main pleine (5), carte défaussée.` });
+      continue;
+    }
 
-  room.phase = "combat";
-  room.turnIndex = Math.floor(Math.random() * room.players.length);
-  room.pendingAttack = null;
+    if (card.type === "defense") {
+      const defenseCount = player.hand.filter((c) => c.type === "defense").length;
+      if (defenseCount >= MAX_DEFENSE_IN_HAND) {
+        player.discard.push(card);
+        room.log.push({ at: Date.now(), type: "defense_cap", message: `${player.name} a déjà 2 défenses en main, carte défaussée.` });
+        continue;
+      }
+    }
 
-  room.players.forEach((p) => {
-    draw(p, 5);
-    p.mulliganUsedTurn = false;
-    p.usedUltimate = false;
-    p.status.counterImmune = false;
-  });
-
-  room.log.push({ at: Date.now(), type: "game_started", message: "Combat lancé." });
-  room.log.push({ at: Date.now(), type: "turn_started", message: `Tour de ${getCurrentPlayer(room).name}.` });
-  return room;
+    player.hand.push(card);
+  }
 }
 
 function getCurrentPlayer(room) {
@@ -161,6 +112,127 @@ function removeCardFromHand(player, cardId) {
   return player.hand.splice(idx, 1)[0];
 }
 
+function spendEnergy(player, amount = 1) {
+  if (player.energy < amount) throw new Error("Énergie insuffisante.");
+  player.energy -= amount;
+}
+
+function startTurn(room) {
+  const current = getCurrentPlayer(room);
+  current.energy = Math.min(MAX_ENERGY, current.energy + ENERGY_PER_TURN);
+  current.status.visionActive = false;
+  room.log.push({
+    at: Date.now(),
+    type: "turn_started",
+    message: `Tour de ${current.name} (+${ENERGY_PER_TURN} énergie, total ${current.energy}/${MAX_ENERGY}).`
+  });
+}
+
+export function createRoom(hostSocketId, hostName) {
+  let code = generateRoomCode();
+  while (rooms.has(code)) code = generateRoomCode();
+
+  const host = makePlayer(hostSocketId, hostName, 0);
+  const room = {
+    code,
+    phase: "lobby",
+    createdAt: Date.now(),
+    turnIndex: 0,
+    players: [host],
+    log: [{ at: Date.now(), type: "room_created", message: `${hostName} a créé la partie ${code}.` }],
+    pendingAttack: null
+  };
+
+  rooms.set(code, room);
+  playersBySocketId.set(hostSocketId, { code, playerId: host.id });
+  return room;
+}
+
+export function joinRoom(code, socketId, playerName) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "lobby") throw new Error("Partie déjà démarrée.");
+  if (room.players.length >= 2) throw new Error("La room est pleine.");
+
+  const player = makePlayer(socketId, playerName, 2);
+  room.players.push(player);
+  playersBySocketId.set(socketId, { code, playerId: player.id });
+  room.log.push({ at: Date.now(), type: "player_joined", message: `${playerName} a rejoint.` });
+
+  return room;
+}
+
+export function startGame(code) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour démarrer.");
+
+  room.phase = "combat";
+  room.turnIndex = Math.floor(Math.random() * room.players.length);
+  room.pendingAttack = null;
+
+  room.players.forEach((p) => {
+    p.hp = STARTING_HP;
+    p.energy = 0;
+    p.hand = [];
+    p.deck = createDeck();
+    p.discard = [];
+    p.status.nextCritical = false;
+    p.status.visionActive = false;
+    addToHandRespectingLimits(room, p, drawRaw(p, 1));
+  });
+
+  room.log.push({ at: Date.now(), type: "game_started", message: "Combat lancé. Chaque joueur pioche 1 carte." });
+  startTurn(room);
+  return room;
+}
+
+export function drawCard(code, playerId) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "combat") throw new Error("Le combat n'a pas commencé.");
+  if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
+
+  const actor = room.players.find((p) => p.id === playerId);
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (actor.hand.length >= MAX_HAND_SIZE) throw new Error("Main pleine (5 cartes max).");
+
+  spendEnergy(actor, 1);
+  const drawn = drawRaw(actor, 1);
+  addToHandRespectingLimits(room, actor, drawn);
+  room.log.push({ at: Date.now(), type: "draw", message: `${actor.name} pioche (coût 1 énergie).` });
+  return room;
+}
+
+export function performAttack(code, playerId, { attackType, targetPlayerId }) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "combat") throw new Error("Le combat n'a pas commencé.");
+  if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
+
+  const actor = room.players.find((p) => p.id === playerId);
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+
+  const attack = ATTACKS[attackType];
+  if (!attack) throw new Error("Type d'attaque invalide.");
+  spendEnergy(actor, 1);
+
+  const target = room.players.find((p) => p.id === targetPlayerId) ?? getOpponent(room, actor.id);
+  if (!target) throw new Error("Aucune cible.");
+
+  room.pendingAttack = {
+    id: uid("attack"),
+    attackerId: actor.id,
+    targetId: target.id,
+    card: attack
+  };
+
+  room.log.push({ at: Date.now(), type: "attack_declared", message: `${actor.name} lance ${attack.label} (coût 1 énergie).` });
+  return room;
+}
+
 export function playCard(code, playerId, { cardId, targetPlayerId }) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
@@ -168,66 +240,36 @@ export function playCard(code, playerId, { cardId, targetPlayerId }) {
   if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
 
   const actor = room.players.find((p) => p.id === playerId);
-  const turnPlayer = getCurrentPlayer(room);
-  if (!actor || turnPlayer.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
 
   const card = removeCardFromHand(actor, cardId);
   const target = room.players.find((p) => p.id === targetPlayerId) ?? getOpponent(room, actor.id);
   if (!target) throw new Error("Aucune cible.");
-
-  if (card.type === "mana") {
-    actor.mana += card.mana;
-    actor.discard.push(card);
-    room.log.push({ at: Date.now(), type: "mana", message: `${actor.name} gagne ${card.mana} mana.` });
-    return room;
+  if (card.type !== "utility") {
+    actor.hand.push(card);
+    throw new Error("Seules les cartes utilitaires sont jouables pendant votre tour.");
   }
 
-  if (card.type === "attack") {
-    room.pendingAttack = {
-      id: uid("attack"),
-      attackerId: actor.id,
-      targetId: target.id,
-      card,
-      facedown: false
-    };
+  if (card.utility === "critical") {
+    actor.status.nextCritical = true;
+    room.log.push({ at: Date.now(), type: "buff", message: `${actor.name} prépare un coup critique.` });
+  } else if (card.utility === "vision") {
+    actor.status.visionActive = true;
+    room.log.push({ at: Date.now(), type: "vision", message: `${actor.name} active Vision et voit le deck adverse.` });
+  } else if (card.utility === "steal") {
+    const utilIndexes = target.deck
+      .map((c, idx) => ({ c, idx }))
+      .filter(({ c }) => c.type === "utility");
 
-    room.log.push({
-      at: Date.now(),
-      type: "attack_declared",
-      message: `${actor.name} attaque ${target.name} (${card.stat}).`
-    });
-    return room;
-  }
-
-  if (card.type === "utility") {
-    if (card.utility === "critical") {
-      actor.status.nextCritical = true;
-      room.log.push({ at: Date.now(), type: "buff", message: `${actor.name} prépare un coup critique.` });
-    } else if (card.utility === "move") {
-      actor.position += card.value;
-      room.log.push({ at: Date.now(), type: "move", message: `${actor.name} avance de ${card.value} cases.` });
-    } else if (card.utility === "vision") {
-      room.log.push({ at: Date.now(), type: "vision", message: `${actor.name} utilise Vision.` });
-    } else if (card.utility === "steal") {
-      if (target.hand.length) {
-        const stolen = target.hand.pop();
-        actor.hand.push(stolen);
-        room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} vole une carte à ${target.name}.` });
-      }
+    if (utilIndexes.length) {
+      const picked = utilIndexes[Math.floor(Math.random() * utilIndexes.length)];
+      const [stolen] = target.deck.splice(picked.idx, 1);
+      addToHandRespectingLimits(room, actor, [stolen]);
+      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} vole une utilitaire du deck de ${target.name}.` });
+    } else {
+      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} tente un vol, sans utilitaire disponible.` });
     }
-    actor.discard.push(card);
-    return room;
-  }
-
-  if (card.type === "skill") {
-    if (actor.usedUltimate) throw new Error("Ultime déjà utilisée.");
-    if (actor.mana < 5) throw new Error("Mana insuffisant.");
-    actor.mana -= 5;
-    actor.usedUltimate = true;
-    actor.status.counterImmune = true;
-    actor.discard.push(card);
-    room.log.push({ at: Date.now(), type: "ultimate", message: `${actor.name} active son ultime.` });
-    return room;
   }
 
   actor.discard.push(card);
@@ -251,31 +293,46 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
     if (defenseCard.type !== "defense") throw new Error("La carte n'est pas défensive.");
   }
 
-  const attackRoll = rollDie() + attack.card.rollMod;
-  const statBonus = attacker.stats[attack.card.stat] ?? 0;
-  let damage = attack.card.baseDamage + statBonus + attackRoll;
-
-  if (attack.card.range === "proximity") damage += 2;
+  let damage = rollDie(attack.card.dieSides);
   if (attacker.status.nextCritical) {
     damage *= 2;
     attacker.status.nextCritical = false;
   }
 
-  if (defenseCard?.defense === "block") {
-    damage = Math.max(0, damage - defenseCard.value);
-  }
+  let reflectedDamage = 0;
+
   if (defenseCard?.defense === "dodge") {
     damage = 0;
   }
-  if (defenseCard?.defense === "counter" && !attacker.status.counterImmune) {
-    const counterDamage = 4 + rollDie();
-    attacker.hp = Math.max(0, attacker.hp - counterDamage);
-    room.log.push({ at: Date.now(), type: "counter", message: `${defender.name} contre: ${counterDamage} dégâts.` });
+
+  if (defenseCard?.defense === "block") {
+    damage = Math.max(0, damage - (defenseCard.value ?? 3));
+  }
+
+  if (defenseCard?.defense === "counter_melee") {
+    if (attack.card.type === "melee") {
+      reflectedDamage = rollDie(6);
+      damage = 0;
+    } else {
+      room.log.push({ at: Date.now(), type: "counter_fail", message: `${defender.name} rate son contre mêlée.` });
+    }
+  }
+
+  if (defenseCard?.defense === "counter_magic") {
+    if (attack.card.type === "magic") {
+      reflectedDamage = rollDie(6);
+      damage = 0;
+    } else {
+      room.log.push({ at: Date.now(), type: "counter_fail", message: `${defender.name} rate son contre magique.` });
+    }
   }
 
   defender.hp = Math.max(0, defender.hp - damage);
+  if (reflectedDamage > 0) {
+    attacker.hp = Math.max(0, attacker.hp - reflectedDamage);
+    room.log.push({ at: Date.now(), type: "counter", message: `${defender.name} contre et renvoie ${reflectedDamage} dégâts.` });
+  }
 
-  attacker.discard.push(attack.card);
   if (defenseCard) defender.discard.push(defenseCard);
 
   room.log.push({
@@ -287,44 +344,15 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   room.pendingAttack = null;
   if (defender.hp <= 0 || attacker.hp <= 0) {
     room.phase = "finished";
-    const winner = attacker.hp > 0 ? attacker.name : defender.name;
+    const winner = attacker.hp > defender.hp ? attacker.name : defender.name;
     room.log.push({ at: Date.now(), type: "game_finished", message: `${winner} remporte le combat.` });
   }
 
   return room;
 }
 
-export function mulligan(code, playerId, cardIds = []) {
-  const room = rooms.get(code);
-  if (!room) throw new Error("Room introuvable.");
-
-  const player = room.players.find((p) => p.id === playerId);
-  const current = getCurrentPlayer(room);
-  if (!player || current.id !== player.id) throw new Error("Action invalide.");
-  if (room.pendingAttack) throw new Error("Impossible pendant une défense en attente.");
-  if (player.mulliganUsedTurn) throw new Error("Mulligan déjà utilisé ce tour.");
-
-  const selected = new Set(cardIds);
-  const kept = [];
-  const discarded = [];
-
-  for (const c of player.hand) {
-    if (selected.has(c.id)) discarded.push(c);
-    else kept.push(c);
-  }
-
-  player.hand = kept;
-  player.discard.push(...discarded);
-  draw(player, discarded.length);
-  player.mulliganUsedTurn = true;
-
-  room.log.push({
-    at: Date.now(),
-    type: "mulligan",
-    message: `${player.name} défausse ${discarded.length} carte(s) puis repioche.`
-  });
-
-  return room;
+export function mulligan() {
+  throw new Error("Le mulligan est désactivé dans ce mode.");
 }
 
 export function endTurn(code, playerId) {
@@ -335,26 +363,27 @@ export function endTurn(code, playerId) {
   const current = getCurrentPlayer(room);
   if (current.id !== playerId) throw new Error("Ce n'est pas votre tour.");
 
-  const sagRoll = rollDie();
-  const sagSuccess = sagRoll + current.stats.SAG >= 7;
-  draw(current, sagSuccess ? 2 : 1);
-  current.mulliganUsedTurn = false;
-
   room.turnIndex = (room.turnIndex + 1) % room.players.length;
-  room.log.push({
-    at: Date.now(),
-    type: "turn_end",
-    message: `${current.name} termine son tour (${sagSuccess ? "+1 pioche SAG" : "pioche normale"}).`
-  });
-  room.log.push({ at: Date.now(), type: "turn_started", message: `Tour de ${getCurrentPlayer(room).name}.` });
+  room.log.push({ at: Date.now(), type: "turn_end", message: `${current.name} termine son tour.` });
+  startTurn(room);
 
   return room;
 }
 
 export function getVisibleState(room, playerId) {
+  const viewer = room.players.find((p) => p.id === playerId);
+  const opponent = getOpponent(room, playerId);
+
   return {
     code: room.code,
     phase: room.phase,
+    config: {
+      maxEnergy: MAX_ENERGY,
+      energyPerTurn: ENERGY_PER_TURN,
+      maxHandSize: MAX_HAND_SIZE,
+      maxDefenseInHand: MAX_DEFENSE_IN_HAND,
+      attacks: Object.values(ATTACKS)
+    },
     turnPlayerId: room.players[room.turnIndex % room.players.length]?.id,
     pendingAttack: room.pendingAttack
       ? {
@@ -369,13 +398,12 @@ export function getVisibleState(room, playerId) {
       id: p.id,
       name: p.name,
       hp: p.hp,
-      mana: p.mana,
+      energy: p.energy,
       position: p.position,
       handCount: p.hand.length,
-      hand: p.id === playerId ? p.hand : undefined,
-      usedUltimate: p.usedUltimate,
-      stats: p.stats
+      hand: p.id === playerId ? p.hand : undefined
     })),
+    opponentDeckPreview: viewer?.status.visionActive && opponent ? opponent.deck.map((c) => `${c.type}:${c.type === "defense" ? c.defense : c.utility}`) : undefined,
     log: room.log.slice(-20)
   };
 }

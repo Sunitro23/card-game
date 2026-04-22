@@ -6,8 +6,9 @@ import {
   getVisibleState,
   joinRoom,
   leaveBySocket,
-  mulligan,
   playCard,
+  performAttack,
+  drawCard,
   resolveDefense,
   rooms,
   startGame,
@@ -85,22 +86,33 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("combat:defend", ({ defenseCardId }) => {
+  socket.on("combat:attack", (payload) => {
     try {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
-      resolveDefense(ref.code, ref.playerId, defenseCardId);
+      performAttack(ref.code, ref.playerId, payload);
       emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);
     }
   });
 
-  socket.on("hand:mulligan", ({ cardIds }) => {
+  socket.on("turn:draw", () => {
     try {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
-      mulligan(ref.code, ref.playerId, cardIds);
+      drawCard(ref.code, ref.playerId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("combat:defend", ({ defenseCardId }) => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      resolveDefense(ref.code, ref.playerId, defenseCardId);
       emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);
