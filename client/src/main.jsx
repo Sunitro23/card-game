@@ -466,8 +466,8 @@ function App() {
     socket.emit("game:start", { code: state.code });
   }
 
-  function handleEndTurn() {
-    socket.emit("turn:end");
+  function handleEndTurnFromSkipIcon() {
+    socket.emit("turn:end", { source: "skip_icon_button" });
   }
 
   function playCard(cardId, targetPlayerId) {
@@ -530,9 +530,6 @@ function App() {
           {state && (
             <>
               <button onClick={handleStartGame}>Démarrer</button>
-              <button onClick={handleEndTurn} disabled={!isMyTurn || Boolean(pendingAttack)}>
-                Fin de tour
-              </button>
               <span>
                 Room <strong>{state.code}</strong> - {state.phase}
               </span>
@@ -613,7 +610,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleEndTurn}
+                    onClick={handleEndTurnFromSkipIcon}
                     disabled={!isMyTurn || Boolean(pendingAttack)}
                     style={{
                       ...styles.skipTurnButton,
