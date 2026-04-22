@@ -352,7 +352,6 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
     const winner = attacker.hp > defender.hp ? attacker.name : defender.name;
     room.log.push({ at: Date.now(), type: "game_finished", message: `${winner} remporte le combat.` });
   }
-
   return room;
 }
 

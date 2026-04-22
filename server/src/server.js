@@ -119,10 +119,11 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("turn:end", () => {
+  socket.on("turn:end", ({ source } = {}) => {
     try {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
+      if (source !== "skip_icon_button") throw new Error("Fin de tour autorisée uniquement via le bouton skip.");
       endTurn(ref.code, ref.playerId);
       emitRoomState(ref.code);
     } catch (err) {
