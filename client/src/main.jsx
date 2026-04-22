@@ -49,16 +49,16 @@ const styles = {
     justifyContent: "center",
     alignItems: "center"
   },
-  arenaCard: {
-    borderRadius: 18,
-    width: "min(100%, 480px)",
-    minHeight: 130,
-    background: "linear-gradient(130deg, #ff2f6f, #ff5f3d)",
-    boxShadow: "0 8px 0 #92203b, 0 18px 30px rgba(34, 12, 30, 0.35)",
+  centerPanel: {
+    borderRadius: 20,
+    width: "min(100%, 640px)",
+    minHeight: 150,
+    background: "linear-gradient(150deg, rgba(8, 21, 55, 0.86), rgba(17, 44, 105, 0.9))",
+    boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.35), 0 14px 28px rgba(12, 16, 38, 0.35)",
     display: "flex",
-    gap: 14,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "space-around",
+    gap: 14,
     padding: 14
   },
   arenaSlot: {
@@ -75,6 +75,23 @@ const styles = {
     fontSize: 13,
     textAlign: "center",
     padding: 8
+  },
+  drawDeckButton: {
+    width: 122,
+    minHeight: 152,
+    borderRadius: 14,
+    border: "3px solid #fff",
+    background: "linear-gradient(135deg, #26b06f, #168f9b)",
+    color: "#fff",
+    boxShadow: "0 10px 16px rgba(5, 18, 27, 0.45)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    fontWeight: 800,
+    cursor: "pointer",
+    transition: "transform 130ms ease, filter 130ms ease"
   },
   playerBadge: {
     display: "inline-flex",
@@ -220,10 +237,11 @@ const styles = {
   modal: {
     width: "min(100%, 820px)",
     borderRadius: 16,
-    background: "linear-gradient(160deg, #f9fcff, #d9ecff)",
+    background: "linear-gradient(135deg, #2b3f89, #4b2b86)",
     padding: 16,
     boxShadow: "0 18px 36px rgba(5, 8, 20, 0.46)",
-    border: "3px solid #fff"
+    border: "3px solid #fff",
+    color: "#fff"
   },
   modalCards: {
     marginTop: 10,
@@ -286,6 +304,15 @@ function attackCardTheme(attackType) {
   if (attackType === "ranged") return { bg: "linear-gradient(135deg, #ff6f4d, #ff3c6f)", icon: "➶", title: "Distance", die: "D4" };
   if (attackType === "magic") return { bg: "linear-gradient(135deg, #2da9ff, #5a46ff)", icon: "✦", title: "Magie", die: "D6" };
   return { bg: "linear-gradient(135deg, #ffd447, #ff8e32)", icon: "⚔", title: "Mêlée", die: "D8" };
+}
+
+function previewCardFromVision(rawCard) {
+  if (!rawCard || typeof rawCard !== "string") return null;
+  const [type, detail] = rawCard.split(":");
+  if (!type || !detail) return null;
+  if (type === "defense") return { type, defense: detail };
+  if (type === "utility") return { type, utility: detail };
+  return null;
 }
 
 function App() {
@@ -467,7 +494,37 @@ function App() {
                     ))}
                   </div>
                   {state.opponentDeckPreview && (
-                    <div style={styles.small}>Deck adverse visible: {state.opponentDeckPreview.join(", ")}</div>
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ ...styles.small, fontWeight: 700, marginBottom: 6 }}>Vision: cartes ennemies révélées</div>
+                      <div style={{ ...styles.modalCards, justifyContent: "flex-start", gap: 6 }}>
+                        {state.opponentDeckPreview.map((rawCard, index) => {
+                          const card = previewCardFromVision(rawCard);
+                          if (!card) return null;
+                          const palette = cardPalette(card);
+                          return (
+                            <div
+                              key={`vision-${rawCard}-${index}`}
+                              style={{
+                                ...styles.cardButton,
+                                background: palette.bg,
+                                width: isMobile ? 78 : 90,
+                                minHeight: isMobile ? 98 : 108,
+                                cursor: "default",
+                                boxShadow: "0 8px 12px rgba(16, 24, 46, 0.32)",
+                                padding: 6
+                              }}
+                            >
+                              <div style={{ ...styles.cardHeader, fontSize: 10 }}>
+                                <span>{card.type === "defense" ? "DEF" : "UTIL"}</span>
+                                <span>{palette.icon}</span>
+                              </div>
+                              <div style={{ ...styles.cardMain, fontSize: 20 }}>{palette.icon}</div>
+                              <div style={{ ...styles.cardSub, fontSize: 10 }}>{cardLabel(card)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </>
               ) : (
@@ -476,8 +533,23 @@ function App() {
             </div>
 
             <div style={styles.centerArena}>
-              <div style={{ ...styles.arenaCard, minHeight: isMobile ? 108 : styles.arenaCard.minHeight, gap: isMobile ? 8 : styles.arenaCard.gap }}>
-                <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>Pioche util/def (1 énergie)</div>
+              <div style={{ ...styles.centerPanel, minHeight: isMobile ? 126 : styles.centerPanel.minHeight, gap: isMobile ? 8 : styles.centerPanel.gap }}>
+                <button
+                  type="button"
+                  onClick={drawCard}
+                  disabled={!isMyTurn || Boolean(pendingAttack)}
+                  style={{
+                    ...styles.drawDeckButton,
+                    width: isMobile ? 98 : styles.drawDeckButton.width,
+                    minHeight: isMobile ? 124 : styles.drawDeckButton.minHeight,
+                    opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
+                  }}
+                  title="Clique pour piocher une carte utilitaire/défense (1 énergie)."
+                >
+                  <div style={styles.actionIcon}>🂠</div>
+                  <div style={{ fontSize: 13 }}>Pioche</div>
+                  <div style={{ fontSize: 11, opacity: 0.9 }}>1 énergie</div>
+                </button>
                 <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
                   {pendingAttack ? `${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}` : "Aucune attaque"}
                 </div>
@@ -568,20 +640,6 @@ function App() {
                     </button>
                   );
                 })}
-                <button
-                  onClick={drawCard}
-                  disabled={!isMyTurn || Boolean(pendingAttack)}
-                  style={{
-                    ...styles.actionCardButton,
-                    background: "linear-gradient(135deg, #26b06f, #168f9b)",
-                    minHeight: isMobile ? 94 : styles.actionCardButton.minHeight,
-                    opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
-                  }}
-                >
-                  <div style={styles.actionIcon}>＋</div>
-                  <div style={styles.actionTitle}>Piocher</div>
-                  <div style={styles.actionSubtitle}>Coût: 1 énergie</div>
-                </button>
               </div>
             </div>
           </section>
@@ -638,13 +696,25 @@ function App() {
               </div>
 
               {invalidDefenseCards.length > 0 && (
-                <p style={{ marginTop: 10, fontSize: 12 }}>
+                <p style={{ marginTop: 10, fontSize: 12, opacity: 0.9 }}>
                   Cartes non proposées car incompatibles: {invalidDefenseCards.map((card) => cardLabel(card)).join(", ")}.
                 </p>
               )}
 
               <div style={{ marginTop: 12 }}>
-                <button onClick={defendWithoutCard}>Subir l'attaque (aucune défense)</button>
+                <button
+                  onClick={defendWithoutCard}
+                  style={{
+                    borderRadius: 12,
+                    border: "2px solid #fff",
+                    background: "rgba(255,255,255,0.16)",
+                    color: "#fff",
+                    padding: "8px 12px",
+                    fontWeight: 700
+                  }}
+                >
+                  Subir l'attaque (aucune défense)
+                </button>
               </div>
             </div>
           </div>
