@@ -261,8 +261,17 @@ export function playCard(code, playerId, { cardId, targetPlayerId }) {
     if (target.hand.length) {
       const pickedIndex = Math.floor(Math.random() * target.hand.length);
       const [stolen] = target.hand.splice(pickedIndex, 1);
-      addToHandRespectingLimits(room, actor, [stolen]);
-      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} vole une carte de la main de ${target.name}.` });
+      if (actor.hand.length >= MAX_HAND_SIZE) {
+        target.hand.push(stolen);
+        room.log.push({
+          at: Date.now(),
+          type: "steal",
+          message: `${actor.name} tente un vol, mais sa main est pleine.`
+        });
+      } else {
+        actor.hand.push(stolen);
+        room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} vole une carte de la main de ${target.name}.` });
+      }
     } else {
       room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} tente un vol, mais ${target.name} n'a pas de carte en main.` });
     }
@@ -399,7 +408,13 @@ export function getVisibleState(room, playerId) {
       handCount: p.hand.length,
       hand: p.id === playerId ? p.hand : undefined
     })),
-    opponentHandPreview: viewer?.status.visionActive && opponent ? opponent.hand.map((c) => `${c.type}:${c.type === "defense" ? c.defense : c.utility}`) : undefined,
+    opponentHandPreview: viewer?.status.visionActive && opponent
+      ? opponent.hand.map((c) => ({
+          type: c.type,
+          defense: c.type === "defense" ? c.defense : undefined,
+          utility: c.type === "utility" ? c.utility : undefined
+        }))
+      : undefined,
     log: room.log.slice(-20)
   };
 }

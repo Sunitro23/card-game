@@ -307,7 +307,9 @@ function attackCardTheme(attackType) {
 }
 
 function previewCardFromVision(rawCard) {
-  if (!rawCard || typeof rawCard !== "string") return null;
+  if (!rawCard) return null;
+  if (typeof rawCard === "object" && rawCard.type) return rawCard;
+  if (typeof rawCard !== "string") return null;
   const [type, detail] = rawCard.split(":");
   if (!type || !detail) return null;
   if (type === "defense") return { type, defense: detail };
