@@ -93,6 +93,29 @@ const styles = {
     cursor: "pointer",
     transition: "transform 130ms ease, filter 130ms ease"
   },
+  deckActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8
+  },
+  skipTurnButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    border: "2px solid #fff",
+    background: "linear-gradient(135deg, #ff8f5b, #ff4f6f)",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 18,
+    fontWeight: 900,
+    lineHeight: 1,
+    padding: 0,
+    boxShadow: "0 8px 14px rgba(5, 18, 27, 0.38)",
+    cursor: "pointer",
+    transition: "transform 130ms ease, filter 130ms ease"
+  },
   playerBadge: {
     display: "inline-flex",
     alignItems: "center",
@@ -249,6 +272,22 @@ const styles = {
     flexWrap: "wrap",
     gap: 10,
     justifyContent: "center"
+  },
+  defenseToast: {
+    position: "fixed",
+    left: "50%",
+    bottom: 16,
+    transform: "translateX(-50%)",
+    zIndex: 40,
+    borderRadius: 12,
+    border: "2px solid #fff",
+    background: "linear-gradient(135deg, #2c8dff, #4c3aff)",
+    color: "#fff",
+    fontWeight: 800,
+    fontSize: 13,
+    padding: "8px 12px",
+    boxShadow: "0 10px 18px rgba(6, 10, 24, 0.35)",
+    animation: "defense-toast-in 240ms ease-out"
   }
 };
 
@@ -323,6 +362,7 @@ function App() {
   const [state, setState] = React.useState(null);
   const [error, setError] = React.useState("");
   const [activeCardId, setActiveCardId] = React.useState(null);
+  const [defenseToast, setDefenseToast] = React.useState("");
   const [isMobile, setIsMobile] = React.useState(() => window.matchMedia("(max-width: 700px)").matches);
 
   React.useEffect(() => {
@@ -391,6 +431,17 @@ function App() {
     }
   }, [me, activeCardId]);
 
+  React.useEffect(() => {
+    const lastLog = state?.log?.[state.log.length - 1];
+    if (!lastLog) return;
+
+    if (["counter", "counter_fail", "attack_resolved"].includes(lastLog.type)) {
+      setDefenseToast(lastLog.message);
+      const timer = setTimeout(() => setDefenseToast(""), 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [state?.log]);
+
   function ensureConnection() {
     if (!socket.connected) socket.connect();
   }
@@ -455,6 +506,16 @@ function App() {
 
   return (
     <main style={{ ...styles.page, padding: isMobile ? 8 : styles.page.padding }}>
+      <style>{`
+        @keyframes defense-pop {
+          0% { transform: scale(0.92) translateY(12px); opacity: 0; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes defense-toast-in {
+          0% { transform: translateX(-50%) translateY(10px); opacity: 0; }
+          100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+      `}</style>
       <div style={styles.panel}>
         <section style={styles.lobby}>
           <strong>Card Game MVP</strong>
@@ -533,22 +594,36 @@ function App() {
 
             <div style={styles.centerArena}>
               <div style={{ ...styles.centerPanel, minHeight: isMobile ? 126 : styles.centerPanel.minHeight, gap: isMobile ? 8 : styles.centerPanel.gap }}>
-                <button
-                  type="button"
-                  onClick={drawCard}
-                  disabled={!isMyTurn || Boolean(pendingAttack)}
-                  style={{
-                    ...styles.drawDeckButton,
-                    width: isMobile ? 98 : styles.drawDeckButton.width,
-                    minHeight: isMobile ? 124 : styles.drawDeckButton.minHeight,
-                    opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
-                  }}
-                  title="Clique pour piocher une carte utilitaire/défense (1 énergie)."
-                >
-                  <div style={styles.actionIcon}>🂠</div>
-                  <div style={{ fontSize: 13 }}>Pioche</div>
-                  <div style={{ fontSize: 11, opacity: 0.9 }}>1 énergie</div>
-                </button>
+                <div style={styles.deckActions}>
+                  <button
+                    type="button"
+                    onClick={drawCard}
+                    disabled={!isMyTurn || Boolean(pendingAttack)}
+                    style={{
+                      ...styles.drawDeckButton,
+                      width: isMobile ? 98 : styles.drawDeckButton.width,
+                      minHeight: isMobile ? 124 : styles.drawDeckButton.minHeight,
+                      opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
+                    }}
+                    title="Clique pour piocher une carte utilitaire/défense (1 énergie)."
+                  >
+                    <div style={styles.actionIcon}>🂠</div>
+                    <div style={{ fontSize: 13 }}>Pioche</div>
+                    <div style={{ fontSize: 11, opacity: 0.9 }}>1 énergie</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEndTurn}
+                    disabled={!isMyTurn || Boolean(pendingAttack)}
+                    style={{
+                      ...styles.skipTurnButton,
+                      opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
+                    }}
+                    title="Passer le tour"
+                  >
+                    <span style={{ transform: "translateX(0.5px)" }}>⏭</span>
+                  </button>
+                </div>
                 {pendingAttack && (
                   <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
                     {`${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}`}
@@ -659,7 +734,7 @@ function App() {
 
         {isMyDefenseTurn && (
           <div style={styles.modalBackdrop}>
-            <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding }}>
+            <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding, animation: "defense-pop 220ms ease-out" }}>
               <h3 style={{ margin: 0 }}>🛡 Défense requise</h3>
               <p style={{ marginBottom: 8 }}>
                 Tu subis <strong>{pendingAttack?.card.label}</strong>. Choisis une défense valide.
@@ -719,6 +794,10 @@ function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {defenseToast && (
+          <div style={styles.defenseToast}>{defenseToast}</div>
         )}
 
         {error && <p style={{ color: "#8b0000", fontWeight: 700 }}>{error}</p>}
