@@ -16,12 +16,21 @@ import {
 } from "./game.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
-const HOST = process.env.HOST ?? "127.0.0.1";
+
+// Si nginx/traefik est sur la MÊME machine et proxy_pass vers localhost:3001,
+// tu peux garder 127.0.0.1.
+// Si tu veux exposer directement le process Node, mets "0.0.0.0".
+const HOST = process.env.HOST ?? "0.0.0.0";
+
 const httpServer = createServer();
 
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_ORIGIN ?? "http://127.0.0.1:5173"
+    origin: [
+      "https://owlbear.sunitro.de",
+      "http://localhost:5173"
+    ],
+    methods: ["GET", "POST"]
   }
 });
 
@@ -32,7 +41,11 @@ function emitRoomState(code) {
   for (const player of room.players) {
     io.to(player.socketId).emit("room:state", getVisibleState(room, player.id));
   }
-  io.to(code).emit("game:event", room.log[room.log.length - 1]);
+
+  const lastLog = room.log[room.log.length - 1];
+  if (lastLog) {
+    io.to(code).emit("game:event", lastLog);
+  }
 }
 
 function onError(socket, err) {
