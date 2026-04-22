@@ -65,4 +65,14 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - Jet de dé + modificateur de carte pour les attaques
 - Pioche bonus via `SAG` sur jet réussi
 
+## Boucle de jeu basique implémentée
+
+- Main visible côté joueur avec jeu de carte direct depuis l'UI.
+- Cartes d'attaque `FOR/DEX/INT` avec bonus dégâts de proximité.
+- Cartes utilitaires : `vision`, `steal`, `critical`, `move`.
+- Cartes défensives : `block`, `dodge`, `counter`.
+- Cartes `mana` + carte `skill` (ultime, coût 5 mana, 1 usage, immunité counter).
+- Bluff CHA : possibilité de jouer n'importe quelle carte face cachée; l'adversaire peut deviner `attack` ou `other`.
+- Mulligan 1 fois par tour.
+
 > Le moteur est volontairement compact : il sert de base robuste pour itérer les équilibrages.

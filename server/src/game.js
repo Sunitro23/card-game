@@ -24,8 +24,11 @@ function generateRoomCode() {
 function createDeck() {
   const cards = [
     { id: uid("atk"), type: "attack", stat: "FOR", baseDamage: 5, range: "proximity", rollMod: 2 },
+    { id: uid("atk"), type: "attack", stat: "FOR", baseDamage: 4, range: "proximity", rollMod: 1 },
     { id: uid("atk"), type: "attack", stat: "DEX", baseDamage: 4, range: "distance", rollMod: 3 },
+    { id: uid("atk"), type: "attack", stat: "DEX", baseDamage: 3, range: "distance", rollMod: 2 },
     { id: uid("atk"), type: "attack", stat: "INT", baseDamage: 4, range: "distance", rollMod: 2 },
+    { id: uid("atk"), type: "attack", stat: "INT", baseDamage: 3, range: "distance", rollMod: 3 },
     { id: uid("def"), type: "defense", defense: "block", value: 4 },
     { id: uid("def"), type: "defense", defense: "dodge", value: 999 },
     { id: uid("def"), type: "defense", defense: "counter", value: 0 },
@@ -33,6 +36,8 @@ function createDeck() {
     { id: uid("util"), type: "utility", utility: "steal" },
     { id: uid("util"), type: "utility", utility: "critical" },
     { id: uid("util"), type: "utility", utility: "move", value: 2 },
+    { id: uid("skill"), type: "skill", skill: "counter_immunity", manaCost: 5 },
+    { id: uid("mana"), type: "mana", mana: 1 },
     { id: uid("mana"), type: "mana", mana: 1 },
     { id: uid("mana"), type: "mana", mana: 1 }
   ];
@@ -173,6 +178,28 @@ export function playCard(code, playerId, { cardId, targetPlayerId, facedown = fa
   const target = room.players.find((p) => p.id === targetPlayerId) ?? getOpponent(room, actor.id);
   if (!target) throw new Error("Aucune cible.");
 
+  const canBluff = facedown && actor.bluffUsesLeft > 0;
+  if (facedown && !canBluff) throw new Error("Bluff indisponible.");
+
+  if (canBluff) {
+    actor.bluffUsesLeft -= 1;
+    room.pendingAttack = {
+      id: uid("attack"),
+      attackerId: actor.id,
+      targetId: target.id,
+      card,
+      facedown: true,
+      declaredType: "hidden"
+    };
+
+    room.log.push({
+      at: Date.now(),
+      type: "attack_declared",
+      message: `${actor.name} joue une carte face cachée contre ${target.name}.`
+    });
+    return room;
+  }
+
   if (card.type === "mana") {
     actor.mana += card.mana;
     actor.discard.push(card);
@@ -181,25 +208,19 @@ export function playCard(code, playerId, { cardId, targetPlayerId, facedown = fa
   }
 
   if (card.type === "attack") {
-    const canBluff = facedown && actor.bluffUsesLeft > 0;
-    if (facedown && !canBluff) throw new Error("Bluff indisponible.");
-    if (canBluff) actor.bluffUsesLeft -= 1;
-
     room.pendingAttack = {
       id: uid("attack"),
       attackerId: actor.id,
       targetId: target.id,
       card,
-      facedown: Boolean(canBluff),
-      declaredType: canBluff ? "hidden" : "attack"
+      facedown: false,
+      declaredType: "attack"
     };
 
     room.log.push({
       at: Date.now(),
       type: "attack_declared",
-      message: canBluff
-        ? `${actor.name} joue une carte face cachée contre ${target.name}.`
-        : `${actor.name} attaque ${target.name} (${card.stat}).`
+      message: `${actor.name} attaque ${target.name} (${card.stat}).`
     });
     return room;
   }
@@ -254,6 +275,18 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   if (defenseCardId) {
     defenseCard = removeCardFromHand(defender, defenseCardId);
     if (defenseCard.type !== "defense") throw new Error("La carte n'est pas défensive.");
+  }
+
+  if (attack.card.type !== "attack") {
+    attacker.discard.push(attack.card);
+    if (defenseCard) defender.discard.push(defenseCard);
+    room.pendingAttack = null;
+    room.log.push({
+      at: Date.now(),
+      type: "bluff_resolved",
+      message: `${attacker.name} bluffait avec une carte ${attack.card.type}. Aucun dégât infligé.`
+    });
+    return room;
   }
 
   const attackRoll = rollDie() + attack.card.rollMod;

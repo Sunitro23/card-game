@@ -11,11 +11,179 @@ const socket = io(socketUrl, {
   transports: ["websocket", "polling"],
 });
 
+const styles = {
+  page: {
+    minHeight: "100vh",
+    padding: 16,
+    fontFamily: "Inter, system-ui, sans-serif",
+    background: "#13c75b",
+    color: "#0d1021",
+    boxSizing: "border-box",
+  },
+  panel: {
+    margin: "0 auto",
+    maxWidth: 1200,
+  },
+  lobby: {
+    background: "rgba(255,255,255,0.85)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+  },
+  board: {
+    position: "relative",
+    borderRadius: 24,
+    minHeight: 560,
+    background: "radial-gradient(circle at center, #2fd46f 0%, #13c75b 52%, #10b752 100%)",
+    boxShadow: "inset 0 0 0 4px rgba(255,255,255,0.2)",
+    padding: 16,
+    overflow: "hidden",
+  },
+  arenaCard: {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    transform: "translate(-50%, -50%)",
+    background: "#d31936",
+    borderRadius: 16,
+    width: 280,
+    height: 160,
+    boxShadow: "0 8px 0 #8c0f23",
+    display: "flex",
+    gap: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  arenaSlot: {
+    border: "4px solid #f4f4f4",
+    width: 76,
+    height: 112,
+    borderRadius: 10,
+    background: "#10111a",
+    color: "#f4f4f4",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+  },
+  playerTop: {
+    position: "absolute",
+    top: 16,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "85%",
+    textAlign: "center",
+  },
+  playerBottom: {
+    position: "absolute",
+    bottom: 16,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "95%",
+  },
+  playerBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    background: "rgba(10,20,40,0.8)",
+    color: "#fff",
+    padding: "6px 12px",
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  handRow: {
+    display: "flex",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  opponentHand: {
+    display: "flex",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 120,
+  },
+  cardBack: {
+    width: 72,
+    height: 104,
+    borderRadius: 10,
+    border: "4px solid #f1f1f1",
+    background: "#10111a",
+    color: "#ffcc00",
+    fontWeight: 900,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transform: "rotate(-3deg)",
+  },
+  myCard: {
+    width: 120,
+    borderRadius: 12,
+    border: "3px solid #fff",
+    background: "#f8f8f8",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+    padding: 8,
+  },
+  myCardTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    minHeight: 34,
+  },
+  small: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  controls: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    background: "rgba(255,255,255,0.88)",
+    display: "grid",
+    gap: 10,
+  },
+  log: {
+    marginTop: 12,
+    maxHeight: 180,
+    overflow: "auto",
+    borderRadius: 12,
+    background: "rgba(8, 18, 28, 0.8)",
+    color: "#fff",
+    padding: 10,
+    fontSize: 13,
+  },
+};
+
+function cardLabel(card) {
+  if (card.type === "attack") {
+    return `ATK ${card.stat}`;
+  }
+  if (card.type === "defense") return `DEF ${card.defense}`;
+  if (card.type === "mana") return `MANA +${card.mana}`;
+  if (card.type === "skill") return `ULTIME`;
+  if (card.type === "utility") return `UTIL ${card.utility}`;
+  return card.type;
+}
+
+function cardDetails(card) {
+  if (card.type === "attack") {
+    return `${card.baseDamage} + dé +${card.rollMod}${card.range === "proximity" ? " (mêlée)" : ""}`;
+  }
+  if (card.type === "skill") return `${card.manaCost} mana`;
+  return "";
+}
+
 function App() {
   const [name, setName] = React.useState("Joueur");
   const [code, setCode] = React.useState("");
   const [state, setState] = React.useState(null);
   const [error, setError] = React.useState("");
+  const [facedownByCard, setFacedownByCard] = React.useState({});
+  const [guess, setGuess] = React.useState("attack");
 
   React.useEffect(() => {
     const onRoomState = (nextState) => {
@@ -35,6 +203,20 @@ function App() {
       socket.off("game:error", onGameError);
     };
   }, []);
+
+  const me = React.useMemo(() => {
+    if (!state) return null;
+    return state.players.find((p) => p.hand);
+  }, [state]);
+
+  const opponents = React.useMemo(() => {
+    if (!state || !me) return [];
+    return state.players.filter((p) => p.id !== me.id);
+  }, [state, me]);
+
+  const pendingAttack = state?.pendingAttack;
+  const isMyDefenseTurn = Boolean(pendingAttack && me && pendingAttack.targetId === me.id);
+  const defenseCards = me?.hand?.filter((c) => c.type === "defense") ?? [];
 
   function ensureConnection() {
     if (!socket.connected) socket.connect();
@@ -64,66 +246,178 @@ function App() {
     socket.emit("turn:end");
   }
 
+  function playCard(cardId, targetPlayerId) {
+    socket.emit("card:play", {
+      cardId,
+      targetPlayerId,
+      facedown: Boolean(facedownByCard[cardId]),
+    });
+  }
+
+  function toggleFacedown(cardId) {
+    setFacedownByCard((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
+  }
+
+  function defend(defenseCardId) {
+    socket.emit("combat:defend", { defenseCardId });
+  }
+
+  function defendWithoutCard() {
+    socket.emit("combat:defend", {});
+  }
+
+  function sendGuess() {
+    socket.emit("combat:bluff:guess", { guess });
+  }
+
+  function useMulligan() {
+    if (!me?.hand?.length) return;
+    const ids = me.hand.slice(0, Math.min(2, me.hand.length)).map((c) => c.id);
+    socket.emit("hand:mulligan", { cardIds: ids });
+  }
+
   return (
-    <main
-      style={{
-        padding: 16,
-        fontFamily: "sans-serif",
-        maxWidth: 420,
-        margin: "0 auto",
-      }}
-    >
-      <h1>Card Game MVP</h1>
-
-      <label style={{ display: "block" }}>
-        <div>Pseudo</div>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{ width: "100%" }}
-        />
-      </label>
-
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button onClick={handleCreateRoom}>Créer</button>
-        <input
-          value={code}
-          placeholder="Code room"
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-        />
-        <button onClick={handleJoinRoom}>Rejoindre</button>
-      </div>
-
-      {state && (
-        <section style={{ marginTop: 16 }}>
-          <p>
-            <strong>Room:</strong> {state.code} ({state.phase})
-          </p>
-
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={handleStartGame}>Démarrer</button>
-            <button onClick={handleEndTurn}>Fin de tour</button>
-          </div>
-
-          <h2>Joueurs</h2>
-          <ul>
-            {state.players.map((p) => (
-              <li key={p.id}>
-                {p.name} - HP {p.hp} - Mana {p.mana} - Main {p.handCount}
-              </li>
-            ))}
-          </ul>
-
-          <h2>Journal</h2>
-          <ul>
-            {state.log.map((entry, idx) => (
-              <li key={`${entry.at}-${idx}`}>{entry.message}</li>
-            ))}
-          </ul>
+    <main style={styles.page}>
+      <div style={styles.panel}>
+        <section style={styles.lobby}>
+          <strong>Card Game MVP</strong>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
+          <button onClick={handleCreateRoom}>Créer</button>
+          <input
+            value={code}
+            placeholder="Code room"
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+          />
+          <button onClick={handleJoinRoom}>Rejoindre</button>
+          {state && (
+            <>
+              <button onClick={handleStartGame}>Démarrer</button>
+              <button onClick={handleEndTurn}>Fin de tour</button>
+              <span>
+                Room <strong>{state.code}</strong> - {state.phase}
+              </span>
+            </>
+          )}
         </section>
-      )}
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+        {state && (
+          <section style={styles.board}>
+            <div style={styles.playerTop}>
+              {opponents[0] ? (
+                <>
+                  <div style={styles.playerBadge}>
+                    {opponents[0].name} · HP {opponents[0].hp} · Mana {opponents[0].mana} · {opponents[0].handCount} cartes
+                  </div>
+                  <div style={styles.opponentHand}>
+                    {Array.from({ length: opponents[0].handCount }).map((_, index) => (
+                      <div key={`opponent-card-${index}`} style={styles.cardBack}>
+                        DOS
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div style={styles.playerBadge}>En attente d'un adversaire...</div>
+              )}
+            </div>
+
+            <div style={styles.arenaCard}>
+              <div style={styles.arenaSlot}>PIOCHE</div>
+              <div style={styles.arenaSlot}>
+                {pendingAttack
+                  ? pendingAttack.facedown
+                    ? "?"
+                    : cardLabel(pendingAttack.card)
+                  : "VIDE"}
+              </div>
+            </div>
+
+            {me && (
+              <div style={styles.playerBottom}>
+                <div style={styles.playerBadge}>
+                  {me.name} · HP {me.hp} · Mana {me.mana} · Bluffs {me.bluffUsesLeft ?? 0}
+                </div>
+                <div style={styles.handRow}>
+                  {me.hand.map((card) => (
+                    <div key={card.id} style={styles.myCard}>
+                      <div style={styles.myCardTitle}>{cardLabel(card)}</div>
+                      <div style={styles.small}>{cardDetails(card)}</div>
+                      <label style={styles.small}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(facedownByCard[card.id])}
+                          onChange={() => toggleFacedown(card.id)}
+                        />{" "}
+                        Face cachée
+                      </label>
+                      <div>
+                        <button
+                          onClick={() => playCard(card.id, opponents[0]?.id)}
+                          disabled={!opponents[0]}
+                        >
+                          Jouer
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {state && (
+          <section style={styles.controls}>
+            <div>
+              <strong>Actions de tour</strong>
+              <div>
+                <button onClick={useMulligan} disabled={!me?.hand?.length}>
+                  Mulligan auto (2)
+                </button>
+              </div>
+            </div>
+
+            {isMyDefenseTurn && (
+              <div>
+                <strong>Défense</strong>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                  {defenseCards.map((card) => (
+                    <button key={card.id} onClick={() => defend(card.id)}>
+                      Défendre: {card.defense}
+                    </button>
+                  ))}
+                  <button onClick={defendWithoutCard}>Aucune défense</button>
+                </div>
+
+                {pendingAttack?.facedown && (
+                  <div style={{ marginTop: 6 }}>
+                    <select value={guess} onChange={(e) => setGuess(e.target.value)}>
+                      <option value="attack">C'est une attaque</option>
+                      <option value="other">Ce n'est pas une attaque</option>
+                    </select>
+                    <button onClick={sendGuess} style={{ marginLeft: 6 }}>
+                      Deviner
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {state && (
+          <section style={styles.log}>
+            <strong>Journal</strong>
+            <ul>
+              {state.log.map((entry, idx) => (
+                <li key={`${entry.at}-${idx}`}>{entry.message}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {error && <p style={{ color: "#8b0000", fontWeight: 700 }}>{error}</p>}
+      </div>
     </main>
   );
 }
