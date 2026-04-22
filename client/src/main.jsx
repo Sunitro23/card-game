@@ -105,10 +105,13 @@ const styles = {
     border: "2px solid #fff",
     background: "linear-gradient(135deg, #ff8f5b, #ff4f6f)",
     color: "#fff",
-    display: "grid",
-    placeItems: "center",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     fontSize: 18,
     fontWeight: 900,
+    lineHeight: 1,
+    padding: 0,
     boxShadow: "0 8px 14px rgba(5, 18, 27, 0.38)",
     cursor: "pointer",
     transition: "transform 130ms ease, filter 130ms ease"
@@ -618,7 +621,7 @@ function App() {
                     }}
                     title="Passer le tour"
                   >
-                    ⏭
+                    <span style={{ transform: "translateX(0.5px)" }}>⏭</span>
                   </button>
                 </div>
                 {pendingAttack && (
