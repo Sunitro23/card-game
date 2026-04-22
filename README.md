@@ -44,9 +44,8 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - `room:join` `{ code, playerName }`
 - `game:start` `{ code }`
 - `turn:end` `{ code }`
-- `card:play` `{ code, cardId, targetPlayerId?, facedown? }`
+- `card:play` `{ code, cardId, targetPlayerId? }`
 - `combat:defend` `{ code, attackId, defenseCardId? }`
-- `combat:bluff:guess` `{ code, attackId, guess: 'attack' | 'other' }`
 - `hand:mulligan` `{ code, cardIds }`
 
 ### Serveur -> client
@@ -59,20 +58,20 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 
 - Attaques basées sur `FOR`, `DEX`, `INT`
 - Dégâts augmentés en mêlée (`proximity`)
-- Bluff (`CHA`) avec limite d'utilisations
 - Compétence ultime (coût en mana, 1 fois/combat)
-- Défausse + repioche (1 fois / tour)
+- Défausse + repioche (1 fois / tour, uniquement durant son tour)
 - Jet de dé + modificateur de carte pour les attaques
 - Pioche bonus via `SAG` sur jet réussi
 
 ## Boucle de jeu basique implémentée
+
+La gestion des tours est stricte côté serveur : seules les actions du joueur actif sont acceptées, et un tour ne peut pas se terminer tant qu'une défense est en attente.
 
 - Main visible côté joueur avec jeu de carte direct depuis l'UI.
 - Cartes d'attaque `FOR/DEX/INT` avec bonus dégâts de proximité.
 - Cartes utilitaires : `vision`, `steal`, `critical`, `move`.
 - Cartes défensives : `block`, `dodge`, `counter`.
 - Cartes `mana` + carte `skill` (ultime, coût 5 mana, 1 usage, immunité counter).
-- Bluff CHA : possibilité de jouer n'importe quelle carte face cachée; l'adversaire peut deviner `attack` ou `other`.
 - Mulligan 1 fois par tour.
 
 > Le moteur est volontairement compact : il sert de base robuste pour itérer les équilibrages.
