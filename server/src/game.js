@@ -256,19 +256,15 @@ export function playCard(code, playerId, { cardId, targetPlayerId }) {
     room.log.push({ at: Date.now(), type: "buff", message: `${actor.name} prépare un coup critique.` });
   } else if (card.utility === "vision") {
     actor.status.visionActive = true;
-    room.log.push({ at: Date.now(), type: "vision", message: `${actor.name} active Vision et voit le deck adverse.` });
+    room.log.push({ at: Date.now(), type: "vision", message: `${actor.name} active Vision et voit la main adverse.` });
   } else if (card.utility === "steal") {
-    const utilIndexes = target.deck
-      .map((c, idx) => ({ c, idx }))
-      .filter(({ c }) => c.type === "utility");
-
-    if (utilIndexes.length) {
-      const picked = utilIndexes[Math.floor(Math.random() * utilIndexes.length)];
-      const [stolen] = target.deck.splice(picked.idx, 1);
+    if (target.hand.length) {
+      const pickedIndex = Math.floor(Math.random() * target.hand.length);
+      const [stolen] = target.hand.splice(pickedIndex, 1);
       addToHandRespectingLimits(room, actor, [stolen]);
-      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} vole une utilitaire du deck de ${target.name}.` });
+      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} vole une carte de la main de ${target.name}.` });
     } else {
-      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} tente un vol, sans utilitaire disponible.` });
+      room.log.push({ at: Date.now(), type: "steal", message: `${actor.name} tente un vol, mais ${target.name} n'a pas de carte en main.` });
     }
   }
 
@@ -403,7 +399,7 @@ export function getVisibleState(room, playerId) {
       handCount: p.hand.length,
       hand: p.id === playerId ? p.hand : undefined
     })),
-    opponentDeckPreview: viewer?.status.visionActive && opponent ? opponent.deck.map((c) => `${c.type}:${c.type === "defense" ? c.defense : c.utility}`) : undefined,
+    opponentHandPreview: viewer?.status.visionActive && opponent ? opponent.hand.map((c) => `${c.type}:${c.type === "defense" ? c.defense : c.utility}`) : undefined,
     log: room.log.slice(-20)
   };
 }

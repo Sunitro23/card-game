@@ -287,8 +287,8 @@ function cardLabel(card) {
 function cardDetails(card) {
   if (card.type === "defense" && card.value) return `Réduction: ${card.value}`;
   if (card.type === "utility" && card.utility === "critical") return "Double les dégâts de ta prochaine attaque.";
-  if (card.type === "utility" && card.utility === "vision") return "Révèle le deck adverse pendant ce tour.";
-  if (card.type === "utility" && card.utility === "steal") return "Vole une utilitaire dans le deck ennemi.";
+  if (card.type === "utility" && card.utility === "vision") return "Révèle la main adverse pendant ce tour.";
+  if (card.type === "utility" && card.utility === "steal") return "Vole une carte aléatoire dans la main ennemie.";
   return "";
 }
 
@@ -489,7 +489,7 @@ function App() {
                   <div style={styles.opponentHand}>
                     {Array.from({ length: opponents[0].handCount }).map((_, index) => (
                       (() => {
-                        const revealedCard = previewCardFromVision(state.opponentDeckPreview?.[index]);
+                        const revealedCard = previewCardFromVision(state.opponentHandPreview?.[index]);
                         const palette = revealedCard ? cardPalette(revealedCard) : null;
                         return (
                           <div
