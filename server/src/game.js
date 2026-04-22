@@ -88,14 +88,54 @@ function addToHandRespectingLimits(room, player, cards) {
     if (card.type === "defense") {
       const defenseCount = player.hand.filter((c) => c.type === "defense").length;
       if (defenseCount >= MAX_DEFENSE_IN_HAND) {
-        player.discard.push(card);
-        room.log.push({ at: Date.now(), type: "defense_cap", message: `${player.name} a déjà 2 défenses en main, carte défaussée.` });
+        const replacement = drawUtilityReplacement(player, card);
+        if (replacement) {
+          player.hand.push(replacement);
+          room.log.push({
+            at: Date.now(),
+            type: "defense_cap",
+            message: `${player.name} a déjà 2 défenses : une carte utilitaire a été piochée à la place.`
+          });
+        } else {
+          room.log.push({
+            at: Date.now(),
+            type: "defense_cap",
+            message: `${player.name} a déjà 2 défenses et aucune utilitaire n'est disponible.`
+          });
+        }
         continue;
       }
     }
 
     player.hand.push(card);
   }
+}
+
+function drawUtilityReplacement(player, blockedDefenseCard) {
+  const skipped = [blockedDefenseCard];
+  const maxAttempts = player.deck.length + player.discard.length;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const [candidate] = drawRaw(player, 1);
+    if (!candidate) break;
+
+    if (candidate.type === "utility") {
+      if (skipped.length) {
+        player.deck.push(...skipped);
+        player.deck = player.deck.sort(() => Math.random() - 0.5);
+      }
+      return candidate;
+    }
+
+    skipped.push(candidate);
+  }
+
+  if (skipped.length) {
+    player.deck.push(...skipped);
+    player.deck = player.deck.sort(() => Math.random() - 0.5);
+  }
+
+  return null;
 }
 
 function getCurrentPlayer(room) {
@@ -139,6 +179,7 @@ export function createRoom(hostSocketId, hostName) {
     createdAt: Date.now(),
     turnIndex: 0,
     players: [host],
+    hostPlayerId: host.id,
     log: [{ at: Date.now(), type: "room_created", message: `${hostName} a créé la partie ${code}.` }],
     pendingAttack: null
   };
@@ -162,9 +203,10 @@ export function joinRoom(code, socketId, playerName) {
   return room;
 }
 
-export function startGame(code) {
+export function startGame(code, requesterPlayerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
+  if (requesterPlayerId && room.hostPlayerId !== requesterPlayerId) throw new Error("Seul l'hôte peut démarrer la partie.");
   if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour démarrer.");
 
   room.phase = "combat";
@@ -398,6 +440,7 @@ export function getVisibleState(room, playerId) {
           card: room.pendingAttack.card
         }
       : null,
+    hostPlayerId: room.hostPlayerId,
     players: room.players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -427,6 +470,9 @@ export function leaveBySocket(socketId) {
   if (!room) return null;
 
   room.players = room.players.filter((p) => p.id !== ref.playerId);
+  if (room.hostPlayerId === ref.playerId) {
+    room.hostPlayerId = room.players[0]?.id ?? null;
+  }
   room.log.push({ at: Date.now(), type: "disconnect", message: "Un joueur a quitté la partie." });
 
   if (!room.players.length) rooms.delete(ref.code);

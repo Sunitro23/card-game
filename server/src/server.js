@@ -68,7 +68,9 @@ io.on("connection", (socket) => {
 
   socket.on("game:start", ({ code }) => {
     try {
-      startGame(code);
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      startGame(code, ref.playerId);
       emitRoomState(code);
     } catch (err) {
       onError(socket, err);
