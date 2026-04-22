@@ -13,125 +13,185 @@ const socket = io(socketUrl, {
 const styles = {
   page: {
     minHeight: "100vh",
-    padding: 12,
-    fontFamily: "Inter, system-ui, sans-serif",
-    background: "#13c75b",
+    padding: 14,
+    fontFamily: "'Trebuchet MS', 'Inter', system-ui, sans-serif",
+    background: "radial-gradient(circle at 50% 20%, #7ad4ff 0%, #5b8cff 38%, #4439a8 100%)",
     color: "#0d1021",
     boxSizing: "border-box"
   },
   panel: {
     margin: "0 auto",
-    maxWidth: 1000
+    maxWidth: 1060
   },
   lobby: {
     background: "rgba(255,255,255,0.9)",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 10,
     marginBottom: 10,
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: 8
+    gap: 8,
+    boxShadow: "0 12px 30px rgba(8,8,26,0.2)"
   },
   board: {
-    borderRadius: 18,
-    minHeight: 420,
-    background: "radial-gradient(circle at center, #2fd46f 0%, #13c75b 52%, #10b752 100%)",
-    boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.2)",
-    padding: 12,
+    borderRadius: 22,
+    minHeight: 460,
+    background: "radial-gradient(circle at center, #8fe8ff 0%, #67b6ff 46%, #4f74da 100%)",
+    boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.45), 0 14px 28px rgba(15,21,55,0.35)",
+    padding: 14,
     display: "grid",
     gridTemplateRows: "auto auto auto",
     gap: 12
   },
   centerArena: {
     display: "flex",
-    justifyContent: "center"
+    justifyContent: "center",
+    alignItems: "center"
   },
   arenaCard: {
-    background: "#d31936",
-    borderRadius: 12,
-    width: "min(100%, 360px)",
-    minHeight: 110,
-    boxShadow: "0 6px 0 #8c0f23",
+    borderRadius: 18,
+    width: "min(100%, 480px)",
+    minHeight: 130,
+    background: "linear-gradient(130deg, #ff2f6f, #ff5f3d)",
+    boxShadow: "0 8px 0 #92203b, 0 18px 30px rgba(34, 12, 30, 0.35)",
     display: "flex",
-    gap: 12,
+    gap: 14,
     justifyContent: "center",
     alignItems: "center",
-    padding: 10
+    padding: 14
   },
   arenaSlot: {
-    border: "3px solid #f4f4f4",
-    width: 110,
-    height: 90,
-    borderRadius: 10,
-    background: "#10111a",
+    border: "3px solid #fefefe",
+    width: 170,
+    minHeight: 94,
+    borderRadius: 12,
+    background: "rgba(14, 20, 41, 0.92)",
     color: "#f4f4f4",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontWeight: 700,
-    fontSize: 12,
+    fontSize: 13,
     textAlign: "center",
-    padding: 4
+    padding: 8
   },
   playerBadge: {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
     borderRadius: 999,
-    background: "rgba(10,20,40,0.8)",
+    background: "rgba(10,20,40,0.78)",
     color: "#fff",
-    padding: "6px 12px",
+    padding: "7px 14px",
     fontSize: 13,
-    marginBottom: 8
+    marginBottom: 10,
+    boxShadow: "0 4px 10px rgba(5,7,16,0.3)"
   },
   handRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-    gap: 8
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    minHeight: 165,
+    padding: "10px 8px"
   },
   opponentHand: {
     display: "flex",
     justifyContent: "center",
     flexWrap: "wrap",
     gap: 6,
-    minHeight: 60
+    minHeight: 74
   },
   cardBack: {
-    width: 48,
-    height: 68,
-    borderRadius: 8,
+    width: 56,
+    height: 78,
+    borderRadius: 10,
     border: "3px solid #f1f1f1",
-    background: "#10111a",
-    color: "#ffcc00",
+    background: "linear-gradient(140deg, #241f84, #5421b8)",
+    color: "#ffde59",
     fontWeight: 900,
     display: "flex",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    boxShadow: "0 6px 0 rgba(8,9,20,0.35)"
   },
-  myCard: {
-    borderRadius: 12,
+  cardButton: {
+    width: 124,
+    minHeight: 152,
+    borderRadius: 14,
     border: "3px solid #fff",
-    background: "#f8f8f8",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-    padding: 8
+    color: "#fff",
+    boxShadow: "0 12px 16px rgba(16, 24, 46, 0.38)",
+    padding: "8px 8px 12px",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    transition: "transform 140ms ease, box-shadow 140ms ease, filter 140ms ease",
+    transformOrigin: "center bottom"
   },
-  myCardTitle: {
-    fontSize: 13,
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 11,
+    opacity: 0.95
+  },
+  cardMain: {
+    fontWeight: 900,
+    fontSize: 28,
+    lineHeight: 1,
+    textShadow: "0 2px 4px rgba(0,0,0,0.25)"
+  },
+  cardSub: {
+    fontSize: 12,
     fontWeight: 700,
-    minHeight: 34
+    opacity: 0.95
   },
   small: {
     fontSize: 12,
-    opacity: 0.8
+    opacity: 0.88
   },
   controls: {
     marginTop: 10,
-    padding: 10,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.88)",
+    padding: 12,
+    borderRadius: 14,
+    background: "rgba(255,255,255,0.9)",
     display: "grid",
     gap: 10
+  },
+  actionCards: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: 10,
+    marginTop: 8
+  },
+  actionCardButton: {
+    minHeight: 110,
+    borderRadius: 14,
+    border: "3px solid #fff",
+    color: "#fff",
+    fontWeight: 800,
+    boxShadow: "0 10px 14px rgba(16, 24, 46, 0.32)",
+    cursor: "pointer",
+    transition: "transform 130ms ease, filter 130ms ease",
+    padding: 10,
+    display: "grid",
+    gap: 4,
+    textAlign: "left"
+  },
+  actionIcon: {
+    fontSize: 24,
+    lineHeight: 1
+  },
+  actionTitle: {
+    fontSize: 13
+  },
+  actionSubtitle: {
+    fontSize: 11,
+    fontWeight: 700,
+    opacity: 0.9
   },
   log: {
     marginTop: 10,
@@ -146,18 +206,86 @@ const styles = {
   turnBox: {
     marginLeft: "auto",
     fontWeight: 700
+  },
+  modalBackdrop: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(2, 6, 22, 0.72)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 30,
+    padding: 12
+  },
+  modal: {
+    width: "min(100%, 820px)",
+    borderRadius: 16,
+    background: "linear-gradient(160deg, #f9fcff, #d9ecff)",
+    padding: 16,
+    boxShadow: "0 18px 36px rgba(5, 8, 20, 0.46)",
+    border: "3px solid #fff"
+  },
+  modalCards: {
+    marginTop: 10,
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center"
   }
 };
 
+function friendlyDefenseName(defense) {
+  const names = {
+    dodge: "Esquive",
+    block: "Blocage",
+    counter_melee: "Contre mêlée",
+    counter_magic: "Contre magie"
+  };
+  return names[defense] ?? defense;
+}
+
+function cardPalette(card) {
+  if (card.type === "utility") return { bg: "linear-gradient(135deg, #7d4dff, #4c72ff)", icon: "★" };
+
+  if (card.defense === "dodge") return { bg: "linear-gradient(135deg, #ff9d4d, #ff5858)", icon: "↺" };
+  if (card.defense === "block") return { bg: "linear-gradient(135deg, #25ad63, #0b7b6a)", icon: "🛡" };
+  if (card.defense === "counter_melee") return { bg: "linear-gradient(135deg, #ffd447, #ff8e32)", icon: "⚔" };
+  if (card.defense === "counter_magic") return { bg: "linear-gradient(135deg, #00a0ff, #4a39ff)", icon: "✦" };
+
+  return { bg: "linear-gradient(135deg, #6d7ea5, #43506c)", icon: "?" };
+}
+
 function cardLabel(card) {
-  if (card.type === "defense") return `DEF ${card.defense}`;
-  if (card.type === "utility") return `UTIL ${card.utility}`;
+  if (card.type === "defense") return friendlyDefenseName(card.defense);
+  if (card.type === "utility") {
+    if (card.utility === "critical") return "Critique";
+    if (card.utility === "vision") return "Vision";
+    if (card.utility === "steal") return "Vol";
+    return `Util ${card.utility}`;
+  }
   return card.type;
 }
 
 function cardDetails(card) {
   if (card.type === "defense" && card.value) return `Réduction: ${card.value}`;
+  if (card.type === "utility" && card.utility === "critical") return "Double les dégâts de ta prochaine attaque.";
+  if (card.type === "utility" && card.utility === "vision") return "Révèle le deck adverse pendant ce tour.";
+  if (card.type === "utility" && card.utility === "steal") return "Vole une utilitaire dans le deck ennemi.";
   return "";
+}
+
+function canDefenseCardAnswerAttack(card, attackType) {
+  if (card.type !== "defense") return false;
+  if (card.defense === "dodge" || card.defense === "block") return true;
+  if (card.defense === "counter_melee") return attackType === "melee";
+  if (card.defense === "counter_magic") return attackType === "magic";
+  return false;
+}
+
+function attackCardTheme(attackType) {
+  if (attackType === "ranged") return { bg: "linear-gradient(135deg, #ff6f4d, #ff3c6f)", icon: "➶", title: "Distance", die: "D4" };
+  if (attackType === "magic") return { bg: "linear-gradient(135deg, #2da9ff, #5a46ff)", icon: "✦", title: "Magie", die: "D6" };
+  return { bg: "linear-gradient(135deg, #ffd447, #ff8e32)", icon: "⚔", title: "Mêlée", die: "D8" };
 }
 
 function App() {
@@ -165,6 +293,16 @@ function App() {
   const [code, setCode] = React.useState("");
   const [state, setState] = React.useState(null);
   const [error, setError] = React.useState("");
+  const [activeCardId, setActiveCardId] = React.useState(null);
+  const [isMobile, setIsMobile] = React.useState(() => window.matchMedia("(max-width: 700px)").matches);
+
+  React.useEffect(() => {
+    const query = window.matchMedia("(max-width: 700px)");
+    const onChange = (event) => setIsMobile(event.matches);
+    query.addEventListener("change", onChange);
+    setIsMobile(query.matches);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   React.useEffect(() => {
     const onRoomState = (nextState) => {
@@ -198,7 +336,31 @@ function App() {
   const pendingAttack = state?.pendingAttack;
   const isMyTurn = Boolean(state && me && state.turnPlayerId === me.id);
   const isMyDefenseTurn = Boolean(pendingAttack && me && pendingAttack.targetId === me.id);
-  const defenseCards = me?.hand?.filter((c) => c.type === "defense") ?? [];
+  const defenseCards = React.useMemo(
+    () => me?.hand?.filter((c) => c.type === "defense") ?? [],
+    [me]
+  );
+
+  const validDefenseCards = React.useMemo(() => {
+    if (!pendingAttack) return [];
+    return defenseCards.filter((card) => canDefenseCardAnswerAttack(card, pendingAttack.card.type));
+  }, [defenseCards, pendingAttack]);
+
+  const invalidDefenseCards = React.useMemo(() => {
+    if (!pendingAttack) return [];
+    return defenseCards.filter((card) => !canDefenseCardAnswerAttack(card, pendingAttack.card.type));
+  }, [defenseCards, pendingAttack]);
+
+  React.useEffect(() => {
+    if (!me) {
+      setActiveCardId(null);
+      return;
+    }
+
+    if (!me.hand.some((card) => card.id === activeCardId)) {
+      setActiveCardId(null);
+    }
+  }, [me, activeCardId]);
 
   function ensureConnection() {
     if (!socket.connected) socket.connect();
@@ -230,6 +392,7 @@ function App() {
 
   function playCard(cardId, targetPlayerId) {
     socket.emit("card:play", { cardId, targetPlayerId });
+    setActiveCardId(null);
   }
 
   function attack(attackType) {
@@ -248,8 +411,21 @@ function App() {
     socket.emit("combat:defend", {});
   }
 
+  function handleCardClick(card) {
+    if (activeCardId === card.id) {
+      if (card.type === "utility" && isMyTurn && !pendingAttack) {
+        playCard(card.id, opponents[0]?.id);
+      } else {
+        setActiveCardId(null);
+      }
+      return;
+    }
+
+    setActiveCardId(card.id);
+  }
+
   return (
-    <main style={styles.page}>
+    <main style={{ ...styles.page, padding: isMobile ? 8 : styles.page.padding }}>
       <div style={styles.panel}>
         <section style={styles.lobby}>
           <strong>Card Game MVP</strong>
@@ -276,7 +452,7 @@ function App() {
         </section>
 
         {state && (
-          <section style={styles.board}>
+          <section style={{ ...styles.board, minHeight: isMobile ? 380 : styles.board.minHeight, padding: isMobile ? 10 : styles.board.padding }}>
             <div>
               {opponents[0] ? (
                 <>
@@ -286,7 +462,7 @@ function App() {
                   <div style={styles.opponentHand}>
                     {Array.from({ length: opponents[0].handCount }).map((_, index) => (
                       <div key={`opponent-card-${index}`} style={styles.cardBack}>
-                        DOS
+                        UNO
                       </div>
                     ))}
                   </div>
@@ -300,9 +476,11 @@ function App() {
             </div>
 
             <div style={styles.centerArena}>
-              <div style={styles.arenaCard}>
-                <div style={styles.arenaSlot}>Pioche util/def (1 énergie)</div>
-                <div style={styles.arenaSlot}>{pendingAttack ? pendingAttack.card.label : "Aucune attaque"}</div>
+              <div style={{ ...styles.arenaCard, minHeight: isMobile ? 108 : styles.arenaCard.minHeight, gap: isMobile ? 8 : styles.arenaCard.gap }}>
+                <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>Pioche util/def (1 énergie)</div>
+                <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
+                  {pendingAttack ? `${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}` : "Aucune attaque"}
+                </div>
               </div>
             </div>
 
@@ -311,23 +489,54 @@ function App() {
                 <div style={styles.playerBadge}>
                   {me.name} · HP {me.hp} · Énergie {me.energy}/{state.config.maxEnergy}
                 </div>
-                <div style={styles.handRow}>
-                  {me.hand.map((card) => (
-                    <div key={card.id} style={styles.myCard}>
-                      <div style={styles.myCardTitle}>{cardLabel(card)}</div>
-                      <div style={styles.small}>{cardDetails(card)}</div>
-                      {card.type === "utility" && (
-                        <div>
-                          <button
-                            onClick={() => playCard(card.id, opponents[0]?.id)}
-                            disabled={!opponents[0] || !isMyTurn || Boolean(pendingAttack)}
-                          >
-                            Utiliser
-                          </button>
+                <div style={{ ...styles.handRow, minHeight: isMobile ? 124 : styles.handRow.minHeight, gap: isMobile ? 6 : styles.handRow.gap }}>
+                  {me.hand.map((card, index) => {
+                    const palette = cardPalette(card);
+                    const isActive = activeCardId === card.id;
+                    const tilt = (index - (me.hand.length - 1) / 2) * 5;
+                    return (
+                      <button
+                        key={card.id}
+                        type="button"
+                        style={{
+                          ...styles.cardButton,
+                          width: isMobile ? 96 : styles.cardButton.width,
+                          minHeight: isMobile ? 124 : styles.cardButton.minHeight,
+                          background: palette.bg,
+                          transform: isActive
+                            ? "translateY(-18px) scale(1.05)"
+                            : `rotate(${tilt}deg) translateY(0px)`,
+                          boxShadow: isActive
+                            ? "0 18px 22px rgba(16, 24, 46, 0.44)"
+                            : styles.cardButton.boxShadow,
+                          filter: isActive ? "saturate(1.2)" : "none",
+                          opacity:
+                            card.type === "utility" && (!isMyTurn || Boolean(pendingAttack)) && !isActive
+                              ? 0.75
+                              : 1
+                        }}
+                        onClick={() => handleCardClick(card)}
+                        title={
+                          card.type === "utility"
+                            ? "Clique une fois pour sélectionner, re-clique pour jouer."
+                            : "Carte défensive utilisée automatiquement via popup en défense."
+                        }
+                      >
+                        <div style={styles.cardHeader}>
+                          <span>{card.type === "defense" ? "DEF" : "UTIL"}</span>
+                          <span>{palette.icon}</span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div style={styles.cardMain}>{palette.icon}</div>
+                        <div style={styles.cardSub}>{cardLabel(card)}</div>
+                        <div style={styles.small}>{cardDetails(card)}</div>
+                        {isActive && card.type === "utility" && isMyTurn && !pendingAttack && (
+                          <div style={{ fontSize: 11, marginTop: 2, fontWeight: 700 }}>
+                            Re-clique pour jouer
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -338,35 +547,43 @@ function App() {
           <section style={styles.controls}>
             <div>
               <strong>Actions de tour</strong>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                <button onClick={() => attack("ranged")} disabled={!isMyTurn || Boolean(pendingAttack)}>
-                  Attaque distance (D4)
-                </button>
-                <button onClick={() => attack("magic")} disabled={!isMyTurn || Boolean(pendingAttack)}>
-                  Attaque magique (D6)
-                </button>
-                <button onClick={() => attack("melee")} disabled={!isMyTurn || Boolean(pendingAttack)}>
-                  Attaque mêlée (D8)
-                </button>
-                <button onClick={drawCard} disabled={!isMyTurn || Boolean(pendingAttack)}>
-                  Piocher (1 énergie)
+              <div style={{ ...styles.actionCards, gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : styles.actionCards.gridTemplateColumns }}>
+                {["ranged", "magic", "melee"].map((attackType) => {
+                  const theme = attackCardTheme(attackType);
+                  return (
+                    <button
+                      key={attackType}
+                      onClick={() => attack(attackType)}
+                      disabled={!isMyTurn || Boolean(pendingAttack)}
+                      style={{
+                        ...styles.actionCardButton,
+                        background: theme.bg,
+                        minHeight: isMobile ? 94 : styles.actionCardButton.minHeight,
+                        opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
+                      }}
+                    >
+                      <div style={styles.actionIcon}>{theme.icon}</div>
+                      <div style={styles.actionTitle}>Attaque {theme.title}</div>
+                      <div style={styles.actionSubtitle}>{theme.die}</div>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={drawCard}
+                  disabled={!isMyTurn || Boolean(pendingAttack)}
+                  style={{
+                    ...styles.actionCardButton,
+                    background: "linear-gradient(135deg, #26b06f, #168f9b)",
+                    minHeight: isMobile ? 94 : styles.actionCardButton.minHeight,
+                    opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
+                  }}
+                >
+                  <div style={styles.actionIcon}>＋</div>
+                  <div style={styles.actionTitle}>Piocher</div>
+                  <div style={styles.actionSubtitle}>Coût: 1 énergie</div>
                 </button>
               </div>
             </div>
-
-            {isMyDefenseTurn && (
-              <div>
-                <strong>Défense</strong>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-                  {defenseCards.map((card) => (
-                    <button key={card.id} onClick={() => defend(card.id)}>
-                      Défendre: {card.defense}
-                    </button>
-                  ))}
-                  <button onClick={defendWithoutCard}>Aucune défense</button>
-                </div>
-              </div>
-            )}
           </section>
         )}
 
@@ -379,6 +596,58 @@ function App() {
               ))}
             </ul>
           </section>
+        )}
+
+        {isMyDefenseTurn && (
+          <div style={styles.modalBackdrop}>
+            <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding }}>
+              <h3 style={{ margin: 0 }}>🛡 Défense requise</h3>
+              <p style={{ marginBottom: 8 }}>
+                Tu subis <strong>{pendingAttack?.card.label}</strong>. Choisis une défense valide.
+              </p>
+
+              <div style={styles.modalCards}>
+                {validDefenseCards.map((card) => {
+                  const palette = cardPalette(card);
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => defend(card.id)}
+                      style={{
+                        ...styles.cardButton,
+                        background: palette.bg,
+                        width: isMobile ? 104 : 132,
+                        minHeight: isMobile ? 132 : 160
+                      }}
+                    >
+                      <div style={styles.cardHeader}>
+                        <span>DEF</span>
+                        <span>{palette.icon}</span>
+                      </div>
+                      <div style={styles.cardMain}>{palette.icon}</div>
+                      <div style={styles.cardSub}>{cardLabel(card)}</div>
+                      <div style={styles.small}>{cardDetails(card)}</div>
+                    </button>
+                  );
+                })}
+
+                {!validDefenseCards.length && (
+                  <div style={{ fontWeight: 700 }}>Aucune carte compatible disponible.</div>
+                )}
+              </div>
+
+              {invalidDefenseCards.length > 0 && (
+                <p style={{ marginTop: 10, fontSize: 12 }}>
+                  Cartes non proposées car incompatibles: {invalidDefenseCards.map((card) => cardLabel(card)).join(", ")}.
+                </p>
+              )}
+
+              <div style={{ marginTop: 12 }}>
+                <button onClick={defendWithoutCard}>Subir l'attaque (aucune défense)</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {error && <p style={{ color: "#8b0000", fontWeight: 700 }}>{error}</p>}
