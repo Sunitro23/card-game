@@ -275,12 +275,55 @@ const styles = {
     boxShadow: "inset 0 0 0 4px rgba(70, 35, 10, 0.34), 0 16px 28px rgba(28, 16, 8, 0.32)",
     padding: 14,
     display: "grid",
-    gap: 12
+    gap: 12,
+    overflow: "hidden"
+  },
+  awaleRowWrap: {
+    display: "grid",
+    gap: 5
   },
   awaleRow: {
     display: "grid",
     gridTemplateColumns: "repeat(6, minmax(44px, 1fr))",
     gap: 10
+  },
+  awaleDirectionRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(5, 1fr)",
+    gap: 10,
+    padding: "0 4%",
+    color: "#fff8dd",
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 1,
+    textShadow: "0 2px 5px rgba(0,0,0,0.38)",
+    pointerEvents: "none"
+  },
+  awaleDirectionArrow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 22
+  },
+  awaleMiddleFlow: {
+    display: "grid",
+    gridTemplateColumns: "44px 1fr 44px",
+    alignItems: "center",
+    minHeight: 30,
+    color: "#fff8dd",
+    fontSize: 24,
+    fontWeight: 900,
+    textShadow: "0 2px 5px rgba(0,0,0,0.38)",
+    pointerEvents: "none"
+  },
+  awaleTurnHint: {
+    borderRadius: 12,
+    background: "rgba(255, 248, 221, 0.92)",
+    color: "#4b260d",
+    padding: "8px 10px",
+    textAlign: "center",
+    fontWeight: 900,
+    boxShadow: "0 8px 14px rgba(35, 18, 5, 0.22)"
   },
   awalePit: {
     minHeight: 100,
@@ -494,7 +537,47 @@ function getAwaleSeedStyle(seedIndex, seedCount, isMobile, isAnimated) {
   };
 }
 
-function AwalePit({ pitIndex, seedCount, isMobile, isMobileLandscape, isLegal, isMyTurn, isDisabled, lastMove, onPlay, isOpponent }) {
+function AwaleDirectionRow({ direction, isMobilePortrait, isMobileLandscape }) {
+  const arrow = direction === "left" ? "←" : "→";
+  return (
+    <div
+      style={{
+        ...styles.awaleDirectionRow,
+        gap: isMobilePortrait ? 4 : isMobileLandscape ? 8 : styles.awaleDirectionRow.gap,
+        fontSize: isMobilePortrait ? 18 : styles.awaleDirectionRow.fontSize,
+        minHeight: isMobilePortrait ? 16 : undefined,
+        padding: isMobilePortrait ? "0 6%" : styles.awaleDirectionRow.padding
+      }}
+      aria-hidden="true"
+    >
+      {Array.from({ length: 5 }).map((_, index) => (
+        <span key={`${direction}-${index}`} style={styles.awaleDirectionArrow}>
+          {arrow}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function AwaleMiddleFlow({ isMobilePortrait }) {
+  return (
+    <div
+      style={{
+        ...styles.awaleMiddleFlow,
+        gridTemplateColumns: isMobilePortrait ? "32px 1fr 32px" : styles.awaleMiddleFlow.gridTemplateColumns,
+        minHeight: isMobilePortrait ? 22 : styles.awaleMiddleFlow.minHeight,
+        fontSize: isMobilePortrait ? 19 : styles.awaleMiddleFlow.fontSize
+      }}
+      aria-label="Le semis suit le bas vers la droite, remonte, puis revient vers la gauche en haut."
+    >
+      <span style={{ textAlign: "center" }}>↓</span>
+      <span />
+      <span style={{ textAlign: "center" }}>↑</span>
+    </div>
+  );
+}
+
+function AwalePit({ pitIndex, seedCount, isMobile, isMobilePortrait, isMobileLandscape, isLegal, isMyTurn, isDisabled, lastMove, onPlay, isOpponent }) {
   const isSource = lastMove?.fromPit === pitIndex;
   const sowStep = lastMove?.sowPath?.lastIndexOf(pitIndex) ?? -1;
   const isSown = sowStep >= 0;
@@ -509,8 +592,9 @@ function AwalePit({ pitIndex, seedCount, isMobile, isMobileLandscape, isLegal, i
       disabled={isDisabled}
       style={{
         ...styles.awalePit,
-        minHeight: isMobile ? 72 : isMobileLandscape ? 116 : styles.awalePit.minHeight,
-        aspectRatio: isMobileLandscape ? "1.18 / 1" : undefined,
+        minHeight: isMobilePortrait ? 58 : isMobile ? 72 : isMobileLandscape ? 116 : styles.awalePit.minHeight,
+        aspectRatio: isMobilePortrait ? "1 / 1.08" : isMobileLandscape ? "1.18 / 1" : undefined,
+        padding: isMobilePortrait ? 5 : styles.awalePit.padding,
         outline: isLegal && isMyTurn ? "3px solid #fff78a" : "none",
         opacity: isDisabled ? (isOpponent ? 0.88 : 0.68) : 1,
         cursor: isDisabled ? "default" : "pointer",
@@ -521,7 +605,13 @@ function AwalePit({ pitIndex, seedCount, isMobile, isMobileLandscape, isLegal, i
       }}
       aria-label={`Trou ${pitIndex + 1}, ${seedCount} graine${seedCount > 1 ? "s" : ""}`}
     >
-      <span style={styles.awaleSeedLayer} aria-hidden="true">
+      <span
+        style={{
+          ...styles.awaleSeedLayer,
+          inset: isMobilePortrait ? 5 : styles.awaleSeedLayer.inset
+        }}
+        aria-hidden="true"
+      >
         {Array.from({ length: seedCount }).map((_, seedIndex) => (
           <span
             key={`${pitIndex}-${lastMove?.id ?? "initial"}-${seedIndex}`}
@@ -559,6 +649,7 @@ function App() {
   }, [getViewportState]);
 
   const isMobile = viewport.width <= 700;
+  const isMobilePortrait = isMobile && viewport.height >= viewport.width;
   const isMobileLandscape = viewport.width <= 950 && viewport.height <= 520 && viewport.width > viewport.height;
 
   React.useEffect(() => {
@@ -706,8 +797,11 @@ function App() {
   }
 
   return (
-    <main style={{ ...styles.page, padding: isMobile ? 8 : isMobileLandscape ? 4 : styles.page.padding }}>
+    <main style={{ ...styles.page, padding: isMobilePortrait ? 6 : isMobile ? 8 : isMobileLandscape ? 4 : styles.page.padding }}>
       <style>{`
+        html, body, #root { margin: 0; min-height: 100%; }
+        * { box-sizing: border-box; }
+        button, input { font: inherit; }
         @keyframes defense-pop {
           0% { transform: scale(0.92) translateY(12px); opacity: 0; }
           100% { transform: scale(1) translateY(0); opacity: 1; }
@@ -803,7 +897,14 @@ function App() {
 
         {state && !isLobbyPhase && isAwaleGame && (
           <section style={{ display: "grid", gap: 10 }}>
-            <div style={styles.awaleScoreBar}>
+            <div
+              style={{
+                ...styles.awaleScoreBar,
+                padding: isMobilePortrait ? 8 : styles.awaleScoreBar.padding,
+                gap: isMobilePortrait ? 6 : styles.awaleScoreBar.gap,
+                fontSize: isMobilePortrait ? 13 : undefined
+              }}
+            >
               {state.players.map((player) => (
                 <span key={player.id}>
                   {player.name}: {state.awale?.captured?.[player.awaleSide] ?? 0} graine(s) capturée(s)
@@ -815,54 +916,89 @@ function App() {
 
             <div
               style={{
-                ...styles.awaleBoard,
-                padding: isMobile ? 10 : isMobileLandscape ? 8 : styles.awaleBoard.padding,
-                gap: isMobileLandscape ? 10 : styles.awaleBoard.gap
+                ...styles.awaleTurnHint,
+                fontSize: isMobilePortrait ? 13 : 15,
+                padding: isMobilePortrait ? "7px 8px" : styles.awaleTurnHint.padding
               }}
             >
-              <div style={{ ...styles.awaleRow, gap: isMobileLandscape ? 12 : styles.awaleRow.gap }}>
-                {awaleRows.opponentRow.map((pitIndex) => (
-                  <AwalePit
-                    key={pitIndex}
-                    pitIndex={pitIndex}
-                    seedCount={state.awale.board[pitIndex]}
-                    isMobile={isMobile}
-                    isMobileLandscape={isMobileLandscape}
-                    isLegal={false}
-                    isMyTurn={false}
-                    isDisabled
-                    isOpponent
-                    lastMove={state.awale.lastMove}
-                  />
-                ))}
-              </div>
+              {isMyTurn && state.phase !== "finished" ? "À toi de jouer : choisis un trou de ton camp." : state.phase === "finished" ? "Partie terminée." : "Tour adverse."}
+            </div>
 
-              <div style={{ textAlign: "center", color: "#fff8dd", fontWeight: 900, textShadow: "0 2px 5px rgba(0,0,0,0.35)" }}>
-                Sens de semis: anti-horaire · {isMyTurn && state.phase !== "finished" ? "Choisis un trou de ton camp" : state.phase === "finished" ? "Partie terminée" : "Tour adverse"}
-              </div>
-
-              <div style={{ ...styles.awaleRow, gap: isMobileLandscape ? 12 : styles.awaleRow.gap }}>
-                {awaleRows.myRow.map((pitIndex) => {
-                  const isLegal = state.awale?.legalMoves?.includes(pitIndex);
-                  return (
+            <div
+              style={{
+                ...styles.awaleBoard,
+                borderRadius: isMobilePortrait ? 18 : styles.awaleBoard.borderRadius,
+                padding: isMobilePortrait ? 8 : isMobile ? 10 : isMobileLandscape ? 8 : styles.awaleBoard.padding,
+                gap: isMobilePortrait ? 6 : isMobileLandscape ? 10 : styles.awaleBoard.gap
+              }}
+            >
+              <div style={{ ...styles.awaleRowWrap, gap: isMobilePortrait ? 3 : styles.awaleRowWrap.gap }}>
+                <AwaleDirectionRow direction="left" isMobilePortrait={isMobilePortrait} isMobileLandscape={isMobileLandscape} />
+                <div
+                  style={{
+                    ...styles.awaleRow,
+                    gridTemplateColumns: isMobilePortrait ? "repeat(6, minmax(0, 1fr))" : styles.awaleRow.gridTemplateColumns,
+                    gap: isMobilePortrait ? 5 : isMobileLandscape ? 12 : styles.awaleRow.gap
+                  }}
+                >
+                  {awaleRows.opponentRow.map((pitIndex) => (
                     <AwalePit
                       key={pitIndex}
                       pitIndex={pitIndex}
                       seedCount={state.awale.board[pitIndex]}
                       isMobile={isMobile}
+                      isMobilePortrait={isMobilePortrait}
                       isMobileLandscape={isMobileLandscape}
-                      isLegal={isLegal}
-                      isMyTurn={isMyTurn}
-                      isDisabled={!isMyTurn || state.phase === "finished" || !isLegal}
+                      isLegal={false}
+                      isMyTurn={false}
+                      isDisabled
+                      isOpponent
                       lastMove={state.awale.lastMove}
-                      onPlay={() => playAwalePit(pitIndex)}
                     />
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+
+              <AwaleMiddleFlow isMobilePortrait={isMobilePortrait} />
+
+              <div style={{ ...styles.awaleRowWrap, gap: isMobilePortrait ? 3 : styles.awaleRowWrap.gap }}>
+                <div
+                  style={{
+                    ...styles.awaleRow,
+                    gridTemplateColumns: isMobilePortrait ? "repeat(6, minmax(0, 1fr))" : styles.awaleRow.gridTemplateColumns,
+                    gap: isMobilePortrait ? 5 : isMobileLandscape ? 12 : styles.awaleRow.gap
+                  }}
+                >
+                  {awaleRows.myRow.map((pitIndex) => {
+                    const isLegal = state.awale?.legalMoves?.includes(pitIndex);
+                    return (
+                      <AwalePit
+                        key={pitIndex}
+                        pitIndex={pitIndex}
+                        seedCount={state.awale.board[pitIndex]}
+                        isMobile={isMobile}
+                        isMobilePortrait={isMobilePortrait}
+                        isMobileLandscape={isMobileLandscape}
+                        isLegal={isLegal}
+                        isMyTurn={isMyTurn}
+                        isDisabled={!isMyTurn || state.phase === "finished" || !isLegal}
+                        lastMove={state.awale.lastMove}
+                        onPlay={() => playAwalePit(pitIndex)}
+                      />
+                    );
+                  })}
+                </div>
+                <AwaleDirectionRow direction="right" isMobilePortrait={isMobilePortrait} isMobileLandscape={isMobileLandscape} />
               </div>
             </div>
 
-            <section style={styles.ruleBox}>
+            <section
+              style={{
+                ...styles.ruleBox,
+                padding: isMobilePortrait ? 10 : styles.ruleBox.padding,
+                fontSize: isMobilePortrait ? 12 : styles.ruleBox.fontSize
+              }}
+            >
               <strong>Règles Awalé classique intégrées</strong>
               <span>Chaque joueur sème depuis ses 6 trous. Une dernière graine chez l'adversaire capture le trou s'il contient 2 ou 3 graines, puis les trous précédents valides.</span>
               <span>Un Kroo (plus de 11 graines) saute toujours le trou de départ. Les coups qui affament l'adversaire sont bloqués. Les boucles terminent la partie sans capturer les graines restantes.</span>
