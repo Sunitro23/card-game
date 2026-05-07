@@ -449,6 +449,7 @@ function friendlyDefenseName(defense) {
 }
 
 function cardPalette(card) {
+  if (card.type === "trump") return { bg: "linear-gradient(135deg, #151d44, #8d4dff)", icon: "♛" };
   if (card.type === "utility") return { bg: "linear-gradient(135deg, #7d4dff, #4c72ff)", icon: "★" };
 
   if (card.defense === "dodge") return { bg: "linear-gradient(135deg, #ff9d4d, #ff5858)", icon: "↺" };
@@ -460,6 +461,7 @@ function cardPalette(card) {
 }
 
 function cardLabel(card) {
+  if (card.type === "trump") return card.name ?? "Trump";
   if (card.type === "defense") return friendlyDefenseName(card.defense);
   if (card.type === "utility") {
     if (card.utility === "critical") return "Critique";
@@ -471,6 +473,25 @@ function cardLabel(card) {
 }
 
 function cardDetails(card) {
+  if (card.type === "trump") {
+    if (card.trumpType === "add_number") return `Cherche un ${card.value} dans le deck numérique.`;
+    if (card.trumpType === "go_for") return `La cible devient ${card.target}.`;
+    if (card.action === "one_up") return "Augmente le bet de +1.";
+    if (card.action === "shield") return "Diminue le bet de -1.";
+    if (card.action === "bless") return "Te sauve si tu devais mourir.";
+    if (card.action === "bloodshed") return "Pioche 1 Trump et bet +1.";
+    if (card.action === "destroy") return "Détruit le dernier Trump adverse.";
+    if (card.action === "friendship") return "Les deux joueurs piochent 2 Trumps.";
+    if (card.action === "reincarnation") return "Destroy + pioche 1 Trump.";
+    if (card.action === "hush") return "Pioche une carte numérique cachée.";
+    if (card.action === "perfect_draw") return "Meilleure carte sûre vers la cible.";
+    if (card.action === "refresh") return "Reset tes cartes numériques puis pioche 2.";
+    if (card.action === "remove") return "Retire la dernière carte adverse.";
+    if (card.action === "return") return "Retire ta dernière carte.";
+    if (card.action === "exchange") return "Échange les dernières cartes.";
+    if (card.action === "disservice") return "Force l'adversaire à piocher.";
+    return "Trump Twenty One.";
+  }
   if (card.type === "defense" && card.value) return `Réduction: ${card.value}`;
   if (card.type === "utility" && card.utility === "critical") return "Double les dégâts de ta prochaine attaque.";
   if (card.type === "utility" && card.utility === "vision") return "Révèle la main adverse pendant ce tour.";
@@ -691,6 +712,7 @@ function App() {
   const isMyDefenseTurn = Boolean(pendingAttack && me && pendingAttack.targetId === me.id);
   const isLobbyPhase = state?.phase === "lobby";
   const isAwaleGame = state?.gameType === "awale";
+  const isTwentyOneGame = state?.gameType === "twenty_one";
   const isHost = Boolean(state && me && state.hostPlayerId === me.id);
   const defenseCards = React.useMemo(
     () => me?.hand?.filter((c) => c.type === "defense") ?? [],
@@ -784,13 +806,32 @@ function App() {
     socket.emit("awale:move", { pitIndex });
   }
 
+  function drawTwentyOneNumber() {
+    socket.emit("twentyone:draw-number");
+  }
+
+  function drawTwentyOneTrump() {
+    socket.emit("twentyone:draw-trump");
+  }
+
+  function standTwentyOne() {
+    socket.emit("twentyone:stand");
+  }
+
+  function playTwentyOneTrump(cardId) {
+    socket.emit("twentyone:play-trump", { cardId });
+    setActiveCardId(null);
+  }
+
   function abortCurrentGame() {
     socket.emit("game:abort");
   }
 
   function handleCardClick(card) {
     if (activeCardId === card.id) {
-      if (card.type === "utility" && isMyTurn && !pendingAttack) {
+      if (card.type === "trump" && isTwentyOneGame && isMyTurn) {
+        playTwentyOneTrump(card.id);
+      } else if (card.type === "utility" && isMyTurn && !pendingAttack) {
         playCard(card.id, opponents[0]?.id);
       } else {
         setActiveCardId(null);
@@ -857,7 +898,8 @@ function App() {
             <div style={styles.gameChoice}>
               {[
                 { id: "card_duel", title: "Duel de cartes", desc: "Le combat temps réel existant." },
-                { id: "awale", title: "Awalé classique", desc: "12 trous, 48 graines, captures par 2 ou 3." }
+                { id: "awale", title: "Awalé classique", desc: "12 trous, 48 graines, captures par 2 ou 3." },
+                { id: "twenty_one", title: "Twenty One", desc: "Approche la cible, joue des Trumps, protège tes 3 vies." }
               ].map((choice) => (
                 <button
                   key={choice.id}
@@ -875,7 +917,7 @@ function App() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>
-              <button style={{ flex: isMobilePortrait ? "1 1 100%" : undefined }} onClick={handleCreateRoom}>Créer une room {gameType === "awale" ? "Awalé" : "Duel"}</button>
+              <button style={{ flex: isMobilePortrait ? "1 1 100%" : undefined }} onClick={handleCreateRoom}>Créer une room {gameType === "awale" ? "Awalé" : gameType === "twenty_one" ? "Twenty One" : "Duel"}</button>
               <input
                 value={code}
                 placeholder="Code room"
@@ -891,7 +933,7 @@ function App() {
           <section style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 12 : styles.homeCard.padding }}>
             <strong style={{ fontSize: 20 }}>Lobby</strong>
             <p style={{ margin: 0 }}>
-              Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : "Duel de cartes"} · En attente des joueurs.
+              Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"} · En attente des joueurs.
             </p>
             <ul style={styles.lobbyPlayers}>
               {state.players.map((player) => (
@@ -1031,7 +1073,101 @@ function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isAwaleGame && (
+
+        {state && !isLobbyPhase && isTwentyOneGame && (
+          <section style={{ display: "grid", gap: isMobilePortrait ? 8 : 12, width: "100%" }}>
+            <div style={{ ...styles.awaleScoreBar, alignItems: "center" }}>
+              <strong>Twenty One · Manche {state.twentyOne?.round}</strong>
+              <span>Cible: {state.twentyOne?.target} · Bet: {state.twentyOne?.bet}</span>
+              <span>Deck: {state.twentyOne?.numberDeckCount} cartes · Trumps: {state.twentyOne?.trumpDeckCount}</span>
+              <button onClick={abortCurrentGame} disabled={state.phase === "finished"}>Abandonner</button>
+            </div>
+
+            <div style={{ ...styles.board, minHeight: "auto", gridTemplateRows: "auto auto auto", background: "radial-gradient(circle at center, #242b62 0%, #17204a 55%, #11162f 100%)" }}>
+              {[opponents[0], me].filter(Boolean).map((player) => {
+                const isSelf = player.id === me?.id;
+                const total = player.twentyOne?.total ?? 0;
+                const busted = total > (state.twentyOne?.target ?? 21);
+                return (
+                  <div key={player.id} style={{ display: "grid", gap: 8 }}>
+                    <div style={{ ...styles.playerBadge, justifyContent: "space-between", flexWrap: "wrap" }}>
+                      <span>{player.name} · {player.twentyOne?.lives} vie(s) · Total {total}{busted ? " · bust" : ""}</span>
+                      <span>{player.twentyOne?.stood ? "Stand" : state.turnPlayerId === player.id && state.phase !== "finished" ? "À jouer" : "En attente"}{player.twentyOne?.bless ? " · Bless" : ""}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                      {(player.twentyOne?.cards ?? []).map((card, index) => (
+                        <div key={`${player.id}-num-${card.id}-${index}`} style={{ ...styles.cardBack, width: 58, height: 78, background: card.hidden && !isSelf ? "linear-gradient(140deg, #141a38, #394080)" : "linear-gradient(140deg, #fff3b0, #ffbf4d)", color: "#17204a", flexDirection: "column" }}>
+                          <span style={{ fontSize: 11 }}>{card.hidden && !isSelf ? "Hush" : "NUM"}</span>
+                          <strong style={{ fontSize: 26 }}>{card.value ?? "?"}</strong>
+                        </div>
+                      ))}
+                      {!(player.twentyOne?.cards?.length) && <span style={{ color: "#fff", opacity: 0.85 }}>Aucune carte numérique.</span>}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div style={{ ...styles.centerPanel, width: "100%", color: "#fff", justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={drawTwentyOneNumber} disabled={!isMyTurn || state.phase === "finished"} style={{ ...styles.drawDeckButton, opacity: !isMyTurn || state.phase === "finished" ? 0.6 : 1 }}>
+                  <div style={styles.actionIcon}>🂡</div>
+                  <div>Carte normale</div>
+                </button>
+                <button onClick={drawTwentyOneTrump} disabled={!isMyTurn || state.phase === "finished"} style={{ ...styles.drawDeckButton, background: "linear-gradient(140deg, #151d44, #8d4dff)", opacity: !isMyTurn || state.phase === "finished" ? 0.6 : 1 }}>
+                  <div style={styles.actionIcon}>♛</div>
+                  <div>Piocher Trump</div>
+                </button>
+                <button onClick={standTwentyOne} disabled={!isMyTurn || state.phase === "finished"} style={{ ...styles.skipTurnButton, width: 96, borderRadius: 16, opacity: !isMyTurn || state.phase === "finished" ? 0.6 : 1 }}>
+                  Stand
+                </button>
+              </div>
+
+              {me && (
+                <div>
+                  <div style={{ ...styles.playerBadge, flexWrap: "wrap" }}>{me.name} · Trumps en main: {me.hand.length}</div>
+                  <div style={{ ...styles.handRow, minHeight: 150 }}>
+                    {me.hand.map((card, index) => {
+                      const palette = cardPalette(card);
+                      const isActive = activeCardId === card.id;
+                      const tilt = (index - (me.hand.length - 1) / 2) * 4;
+                      return (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={() => handleCardClick(card)}
+                          style={{
+                            ...styles.cardButton,
+                            width: isMobilePortrait ? "clamp(106px, 31vw, 124px)" : isMobile ? 104 : styles.cardButton.width,
+                            minHeight: isMobilePortrait ? 138 : isMobile ? 132 : styles.cardButton.minHeight,
+                            background: palette.bg,
+                            transform: isActive ? "translateY(-18px) scale(1.05)" : `rotate(${tilt}deg)`,
+                            opacity: !isMyTurn && !isActive ? 0.72 : 1
+                          }}
+                          title="Clique une fois pour sélectionner, re-clique pour jouer ce Trump."
+                        >
+                          <div style={styles.cardHeader}><span>TRUMP</span><span>{palette.icon}</span></div>
+                          <div style={{ ...styles.cardMain, fontSize: 30 }}>{palette.icon}</div>
+                          <div style={styles.cardSub}>{cardLabel(card)}</div>
+                          <div style={styles.small}>{cardDetails(card)}</div>
+                          {isActive && isMyTurn && <div style={{ fontSize: 11, marginTop: 2, fontWeight: 700 }}>Re-clique pour jouer</div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <section style={styles.ruleBox}>
+              <strong>Règles Twenty One intégrées</strong>
+              <span>Chaque manche vise la cible active (21 par défaut). Les Go For peuvent la changer en 17, 24 ou 27.</span>
+              <span>Le meilleur total est le plus proche de la cible. Le perdant de la manche perd le bet en vies; Bless peut empêcher une mort.</span>
+              <span>Les Trumps Add Number, Go For, Bet et Deck sont jouables depuis ta main pendant ton tour.</span>
+              {state.phase === "finished" && <strong>{state.players.find((player) => player.id === state.twentyOne?.winnerId)?.name ?? "Un joueur"} gagne.</strong>}
+            </section>
+          </section>
+        )}
+
+        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
           <section
             style={{
               ...styles.board,
@@ -1199,7 +1335,7 @@ function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isAwaleGame && (
+        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
           <section style={{ ...styles.controls, marginTop: isMobilePortrait ? 8 : styles.controls.marginTop, padding: isMobilePortrait ? 8 : styles.controls.padding, borderRadius: isMobilePortrait ? 12 : styles.controls.borderRadius }}>
             <div>
               <strong>Actions de tour</strong>
@@ -1241,7 +1377,7 @@ function App() {
           </section>
         )}
 
-        {!isLobbyPhase && !isAwaleGame && isMyDefenseTurn && (
+        {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && isMyDefenseTurn && (
           <div style={styles.modalBackdrop}>
             <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding, animation: "defense-pop 220ms ease-out" }}>
               <h3 style={{ margin: 0 }}>🛡 Défense requise</h3>
