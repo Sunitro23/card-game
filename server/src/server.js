@@ -10,9 +10,13 @@ import {
   playCard,
   performAttack,
   drawCard,
+  drawTwentyOneNumberCard,
+  drawTwentyOneTrumpCard,
   playAwaleMove,
+  playTwentyOneTrump,
   resolveDefense,
   rooms,
+  standTwentyOne,
   startGame,
   playersBySocketId
 } from "./game.js";
@@ -85,6 +89,51 @@ io.on("connection", (socket) => {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
       playAwaleMove(ref.code, ref.playerId, pitIndex);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+
+  socket.on("twentyone:draw-number", () => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      drawTwentyOneNumberCard(ref.code, ref.playerId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("twentyone:draw-trump", () => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      drawTwentyOneTrumpCard(ref.code, ref.playerId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("twentyone:play-trump", ({ cardId }) => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      playTwentyOneTrump(ref.code, ref.playerId, cardId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("twentyone:stand", () => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      standTwentyOne(ref.code, ref.playerId);
       emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);

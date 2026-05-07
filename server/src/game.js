@@ -9,6 +9,10 @@ const MAX_DEFENSE_IN_HAND = 2;
 const AWALE_SEEDS_PER_PIT = 4;
 const AWALE_PITS_PER_PLAYER = 6;
 const AWALE_TOTAL_PITS = AWALE_PITS_PER_PLAYER * 2;
+const TWENTY_ONE_STARTING_LIVES = 3;
+const TWENTY_ONE_STARTING_TARGET = 21;
+const TWENTY_ONE_STARTING_BET = 1;
+const TWENTY_ONE_STARTING_TRUMPS = 3;
 
 const ATTACKS = {
   ranged: { type: "ranged", label: "Attaque à distance", dieSides: 4 },
@@ -173,7 +177,182 @@ function startTurn(room) {
 }
 
 function normalizeGameType(gameType) {
-  return gameType === "awale" ? "awale" : "card_duel";
+  if (gameType === "awale") return "awale";
+  if (gameType === "twenty_one") return "twenty_one";
+  return "card_duel";
+}
+
+const TWENTY_ONE_TRUMP_DEFS = [
+  ...[2, 3, 4, 5, 6, 7].map((value) => ({ type: "trump", trumpType: "add_number", value, name: `${value}-Card` })),
+  { type: "trump", trumpType: "go_for", target: 17, name: "Go For 17" },
+  { type: "trump", trumpType: "go_for", target: 24, name: "Go For 24" },
+  { type: "trump", trumpType: "go_for", target: 27, name: "Go For 27" },
+  { type: "trump", trumpType: "bet", action: "one_up", name: "One-Up" },
+  { type: "trump", trumpType: "bet", action: "shield", name: "Shield" },
+  { type: "trump", trumpType: "bet", action: "bless", name: "Bless" },
+  { type: "trump", trumpType: "bet", action: "bloodshed", name: "Bloodshed" },
+  { type: "trump", trumpType: "bet", action: "destroy", name: "Destroy" },
+  { type: "trump", trumpType: "bet", action: "friendship", name: "Friendship" },
+  { type: "trump", trumpType: "bet", action: "reincarnation", name: "Reincarnation" },
+  { type: "trump", trumpType: "deck", action: "hush", name: "Hush" },
+  { type: "trump", trumpType: "deck", action: "perfect_draw", name: "Perfect Draw" },
+  { type: "trump", trumpType: "deck", action: "refresh", name: "Refresh" },
+  { type: "trump", trumpType: "deck", action: "remove", name: "Remove" },
+  { type: "trump", trumpType: "deck", action: "return", name: "Return" },
+  { type: "trump", trumpType: "deck", action: "exchange", name: "Exchange" },
+  { type: "trump", trumpType: "deck", action: "disservice", name: "Disservice" }
+];
+
+function createTwentyOneNumberDeck() {
+  const cards = [];
+  for (let value = 1; value <= 10; value += 1) {
+    for (let copy = 0; copy < 4; copy += 1) cards.push({ id: uid("num"), value, hidden: false });
+  }
+  return cards.sort(() => Math.random() - 0.5);
+}
+
+function createTwentyOneTrumpDeck() {
+  const cards = [];
+  for (let copy = 0; copy < 2; copy += 1) {
+    for (const def of TWENTY_ONE_TRUMP_DEFS) cards.push({ id: uid("trump"), ...def });
+  }
+  return cards.sort(() => Math.random() - 0.5);
+}
+
+function twentyOnePlayerState() {
+  return { lives: TWENTY_ONE_STARTING_LIVES, cards: [], stood: false, lastTrump: null, bless: false };
+}
+
+function twentyOneTotal(player) {
+  return player.twentyOne.cards.reduce((total, card) => total + card.value, 0);
+}
+
+function drawTwentyOneTrump(room, player, count = 1) {
+  const drawn = [];
+  for (let i = 0; i < count; i += 1) {
+    if (!room.twentyOne.trumpDeck.length) break;
+    const card = room.twentyOne.trumpDeck.pop();
+    player.hand.push(card);
+    drawn.push(card);
+  }
+  return drawn;
+}
+
+function drawTwentyOneNumber(room, player, { hidden = false, value = null, perfect = false } = {}) {
+  let index = -1;
+  if (value !== null) {
+    index = room.twentyOne.numberDeck.findIndex((card) => card.value === value);
+  } else if (perfect) {
+    const total = twentyOneTotal(player);
+    const target = room.twentyOne.target;
+    let bestValue = -1;
+    room.twentyOne.numberDeck.forEach((card, cardIndex) => {
+      if (total + card.value <= target && card.value > bestValue) {
+        bestValue = card.value;
+        index = cardIndex;
+      }
+    });
+  } else if (room.twentyOne.numberDeck.length) {
+    index = room.twentyOne.numberDeck.length - 1;
+  }
+
+  if (index < 0) return null;
+  const [card] = room.twentyOne.numberDeck.splice(index, 1);
+  player.twentyOne.cards.push({ ...card, hidden });
+  return card;
+}
+
+function returnTwentyOneNumberCards(room, cards) {
+  room.twentyOne.numberDeck.push(...cards.map((card) => ({ id: uid("num"), value: card.value, hidden: false })));
+  room.twentyOne.numberDeck = room.twentyOne.numberDeck.sort(() => Math.random() - 0.5);
+}
+
+function resetTwentyOneRound(room) {
+  room.twentyOne.round += 1;
+  room.twentyOne.target = TWENTY_ONE_STARTING_TARGET;
+  room.twentyOne.bet = TWENTY_ONE_STARTING_BET;
+  room.twentyOne.numberDeck = createTwentyOneNumberDeck();
+  for (const player of room.players) {
+    player.twentyOne.cards = [];
+    player.twentyOne.stood = false;
+    player.twentyOne.lastTrump = null;
+    player.twentyOne.bless = false;
+  }
+}
+
+function destroyLastOpponentTrump(room, actor, opponent) {
+  const destroyed = opponent.twentyOne.lastTrump;
+  if (!destroyed) return null;
+  if (destroyed.trumpType === "go_for") room.twentyOne.target = TWENTY_ONE_STARTING_TARGET;
+  if (destroyed.trumpType === "bet" && destroyed.action === "one_up") room.twentyOne.bet = Math.max(0, room.twentyOne.bet - 1);
+  if (destroyed.trumpType === "bet" && destroyed.action === "shield") room.twentyOne.bet += 1;
+  if (destroyed.trumpType === "bet" && destroyed.action === "bless") opponent.twentyOne.bless = false;
+  opponent.twentyOne.lastTrump = null;
+  room.log.push({ at: Date.now(), type: "twenty_one_destroy", message: `${actor.name} détruit ${destroyed.name} de ${opponent.name}.` });
+  return destroyed;
+}
+
+function scoreTwentyOnePlayer(player, target) {
+  const total = twentyOneTotal(player);
+  return { total, distance: Math.abs(target - total), busted: total > target };
+}
+
+function resolveTwentyOneRound(room) {
+  const [a, b] = room.players;
+  const scoreA = scoreTwentyOnePlayer(a, room.twentyOne.target);
+  const scoreB = scoreTwentyOnePlayer(b, room.twentyOne.target);
+  let loser = null;
+
+  if (scoreA.busted && !scoreB.busted) loser = a;
+  else if (scoreB.busted && !scoreA.busted) loser = b;
+  else if (scoreA.distance < scoreB.distance) loser = b;
+  else if (scoreB.distance < scoreA.distance) loser = a;
+
+  if (!loser) {
+    room.log.push({ at: Date.now(), type: "twenty_one_round_tie", message: `Manche ${room.twentyOne.round} nulle : ${a.name} ${scoreA.total}, ${b.name} ${scoreB.total}, cible ${room.twentyOne.target}.` });
+    resetTwentyOneRound(room);
+    room.log.push({ at: Date.now(), type: "twenty_one_round_start", message: `Manche ${room.twentyOne.round} lancée. Cible 21, bet 1.` });
+    return;
+  }
+
+  const winner = loser.id === a.id ? b : a;
+  const damage = room.twentyOne.bet;
+  if (loser.twentyOne.lives - damage <= 0 && loser.twentyOne.bless) {
+    loser.twentyOne.bless = false;
+    loser.twentyOne.lives = 1;
+    room.log.push({ at: Date.now(), type: "twenty_one_bless", message: `${loser.name} est sauvé par Bless et reste à 1 vie.` });
+  } else {
+    loser.twentyOne.lives = Math.max(0, loser.twentyOne.lives - damage);
+  }
+
+  room.log.push({
+    at: Date.now(),
+    type: "twenty_one_round_resolved",
+    message: `${winner.name} gagne la manche ${room.twentyOne.round} (${scoreTwentyOnePlayer(winner, room.twentyOne.target).total} vs ${scoreTwentyOnePlayer(loser, room.twentyOne.target).total}, cible ${room.twentyOne.target}). ${loser.name} perd ${damage} vie(s).`
+  });
+
+  if (loser.twentyOne.lives <= 0) {
+    room.phase = "finished";
+    room.twentyOne.winnerId = winner.id;
+    room.log.push({ at: Date.now(), type: "game_finished", message: `${winner.name} remporte Twenty One.` });
+    return;
+  }
+
+  resetTwentyOneRound(room);
+  room.log.push({ at: Date.now(), type: "twenty_one_round_start", message: `Manche ${room.twentyOne.round} lancée. Cible 21, bet 1.` });
+}
+
+function advanceTwentyOneTurn(room) {
+  if (room.phase !== "twenty_one") return;
+  if (room.players.every((player) => player.twentyOne.stood)) {
+    resolveTwentyOneRound(room);
+    return;
+  }
+  for (let step = 0; step < room.players.length; step += 1) {
+    room.turnIndex = (room.turnIndex + 1) % room.players.length;
+    if (!getCurrentPlayer(room).twentyOne.stood) break;
+  }
+  if (room.phase === "twenty_one") room.log.push({ at: Date.now(), type: "turn_started", message: `Tour de ${getCurrentPlayer(room).name}.` });
 }
 
 function isAwaleSidePit(pitIndex, side) {
@@ -276,7 +455,8 @@ export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
     hostPlayerId: host.id,
     log: [{ at: Date.now(), type: "room_created", message: `${hostName} a créé la partie ${code}.` }],
     pendingAttack: null,
-    awale: null
+    awale: null,
+    twentyOne: null
   };
 
   rooms.set(code, room);
@@ -323,6 +503,29 @@ export function startGame(code, requesterPlayerId) {
       type: "game_started",
       message: `Awalé lancé. ${getCurrentPlayer(room).name} joue en premier.`
     });
+    return room;
+  }
+
+  if (room.gameType === "twenty_one") {
+    room.phase = "twenty_one";
+    room.twentyOne = {
+      round: 1,
+      target: TWENTY_ONE_STARTING_TARGET,
+      bet: TWENTY_ONE_STARTING_BET,
+      numberDeck: createTwentyOneNumberDeck(),
+      trumpDeck: createTwentyOneTrumpDeck(),
+      winnerId: null
+    };
+    room.players.forEach((p) => {
+      p.hp = p.twentyOne?.lives ?? TWENTY_ONE_STARTING_LIVES;
+      p.energy = 0;
+      p.hand = [];
+      p.deck = [];
+      p.discard = [];
+      p.twentyOne = twentyOnePlayerState();
+      drawTwentyOneTrump(room, p, TWENTY_ONE_STARTING_TRUMPS);
+    });
+    room.log.push({ at: Date.now(), type: "game_started", message: `Twenty One lancé. Cible 21, bet 1. ${getCurrentPlayer(room).name} joue en premier.` });
     return room;
   }
 
@@ -429,6 +632,17 @@ export function abortGame(code, playerId) {
   if (quitterSide < 0) throw new Error("Joueur introuvable.");
   const winnerSide = quitterSide === 0 ? 1 : 0;
 
+  if (room.gameType === "twenty_one" && room.twentyOne) {
+    room.phase = "finished";
+    room.twentyOne.winnerId = room.players[winnerSide].id;
+    room.log.push({
+      at: Date.now(),
+      type: "game_finished",
+      message: `${room.players[quitterSide].name} abandonne. ${room.players[winnerSide].name} remporte Twenty One.`
+    });
+    return room;
+  }
+
   if (room.gameType === "awale" && room.awale) {
     const remaining = room.awale.board.reduce((total, seeds) => total + seeds, 0);
     room.awale.board = Array(AWALE_TOTAL_PITS).fill(0);
@@ -447,6 +661,147 @@ export function abortGame(code, playerId) {
     type: "game_finished",
     message: `${room.players[quitterSide].name} abandonne. ${room.players[winnerSide].name} remporte le combat.`
   });
+  return room;
+}
+
+export function drawTwentyOneNumberCard(code, playerId) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
+
+  const actor = room.players.find((p) => p.id === playerId);
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
+
+  const card = drawTwentyOneNumber(room, actor);
+  if (!card) throw new Error("Deck numérique vide.");
+  room.log.push({ at: Date.now(), type: "twenty_one_draw", message: `${actor.name} pioche une carte numérique.` });
+
+  if (twentyOneTotal(actor) > room.twentyOne.target) actor.twentyOne.stood = true;
+  advanceTwentyOneTurn(room);
+  return room;
+}
+
+export function drawTwentyOneTrumpCard(code, playerId) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
+
+  const actor = room.players.find((p) => p.id === playerId);
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
+
+  const drawn = drawTwentyOneTrump(room, actor, 1);
+  if (!drawn.length) throw new Error("Deck Trump vide.");
+  room.log.push({ at: Date.now(), type: "twenty_one_trump_draw", message: `${actor.name} pioche 1 Trump.` });
+  advanceTwentyOneTurn(room);
+  return room;
+}
+
+export function standTwentyOne(code, playerId) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
+
+  const actor = room.players.find((p) => p.id === playerId);
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  actor.twentyOne.stood = true;
+  room.log.push({ at: Date.now(), type: "twenty_one_stand", message: `${actor.name} stand à ${twentyOneTotal(actor)}.` });
+  advanceTwentyOneTurn(room);
+  return room;
+}
+
+export function playTwentyOneTrump(code, playerId, cardId) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
+
+  const actor = room.players.find((p) => p.id === playerId);
+  const current = getCurrentPlayer(room);
+  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
+  const opponent = getOpponent(room, actor.id);
+  if (!opponent) throw new Error("Aucun adversaire.");
+
+  const card = removeCardFromHand(actor, cardId);
+  if (card.type !== "trump") {
+    actor.hand.push(card);
+    throw new Error("Cette carte n'est pas un Trump Twenty One.");
+  }
+
+  let consumed = true;
+  let message = `${actor.name} joue ${card.name}.`;
+
+  if (card.trumpType === "add_number") {
+    const drawn = drawTwentyOneNumber(room, actor, { value: card.value });
+    message = drawn ? `${actor.name} joue ${card.name} et reçoit un ${card.value}.` : `${actor.name} joue ${card.name}, mais aucun ${card.value} n'est disponible.`;
+  } else if (card.trumpType === "go_for") {
+    room.twentyOne.target = card.target;
+    message = `${actor.name} change la cible : Go For ${card.target}.`;
+  } else if (card.trumpType === "bet") {
+    if (card.action === "one_up") room.twentyOne.bet += 1;
+    if (card.action === "shield") room.twentyOne.bet = Math.max(0, room.twentyOne.bet - 1);
+    if (card.action === "bless") actor.twentyOne.bless = true;
+    if (card.action === "bloodshed") {
+      drawTwentyOneTrump(room, actor, 1);
+      room.twentyOne.bet += 1;
+    }
+    if (card.action === "destroy") {
+      consumed = Boolean(destroyLastOpponentTrump(room, actor, opponent));
+      message = consumed ? message : `${actor.name} joue Destroy, mais aucun Trump adverse ne peut être détruit.`;
+    }
+    if (card.action === "friendship") drawTwentyOneTrump(room, actor, 2), drawTwentyOneTrump(room, opponent, 2);
+    if (card.action === "reincarnation") {
+      consumed = Boolean(destroyLastOpponentTrump(room, actor, opponent));
+      if (consumed) drawTwentyOneTrump(room, actor, 1);
+      message = consumed ? `${actor.name} joue Reincarnation, détruit le dernier Trump adverse et pioche 1 Trump.` : `${actor.name} joue Reincarnation, mais aucun Trump adverse ne peut être détruit.`;
+    }
+  } else if (card.trumpType === "deck") {
+    if (card.action === "hush") drawTwentyOneNumber(room, actor, { hidden: true });
+    if (card.action === "perfect_draw") {
+      const drawn = drawTwentyOneNumber(room, actor, { perfect: true });
+      message = drawn ? `${actor.name} réalise un Perfect Draw.` : `${actor.name} tente Perfect Draw, mais aucune carte sûre n'est disponible.`;
+    }
+    if (card.action === "refresh") {
+      returnTwentyOneNumberCards(room, actor.twentyOne.cards);
+      actor.twentyOne.cards = [];
+      drawTwentyOneNumber(room, actor);
+      drawTwentyOneNumber(room, actor);
+    }
+    if (card.action === "remove") {
+      const removed = opponent.twentyOne.cards.pop();
+      if (removed) returnTwentyOneNumberCards(room, [removed]);
+      message = removed ? message : `${actor.name} joue Remove, mais ${opponent.name} n'a pas de carte numérique.`;
+    }
+    if (card.action === "return") {
+      const removed = actor.twentyOne.cards.pop();
+      if (removed) returnTwentyOneNumberCards(room, [removed]);
+      message = removed ? message : `${actor.name} joue Return, mais n'a pas de carte numérique.`;
+    }
+    if (card.action === "exchange") {
+      const own = actor.twentyOne.cards.pop();
+      const other = opponent.twentyOne.cards.pop();
+      if (own && other) {
+        actor.twentyOne.cards.push({ ...other, hidden: false });
+        opponent.twentyOne.cards.push({ ...own, hidden: false });
+      } else {
+        if (own) actor.twentyOne.cards.push(own);
+        if (other) opponent.twentyOne.cards.push(other);
+        message = `${actor.name} joue Exchange, mais l'échange est impossible.`;
+      }
+    }
+    if (card.action === "disservice") drawTwentyOneNumber(room, opponent);
+  }
+
+  actor.discard.push(card);
+  if (consumed) actor.twentyOne.lastTrump = card;
+  room.log.push({ at: Date.now(), type: "twenty_one_trump", message });
+  if (twentyOneTotal(actor) > room.twentyOne.target) actor.twentyOne.stood = true;
+  if (twentyOneTotal(opponent) > room.twentyOne.target) opponent.twentyOne.stood = true;
+  advanceTwentyOneTurn(room);
   return room;
 }
 
@@ -651,7 +1006,8 @@ export function getVisibleState(room, playerId) {
       maxHandSize: MAX_HAND_SIZE,
       maxDefenseInHand: MAX_DEFENSE_IN_HAND,
       attacks: Object.values(ATTACKS),
-      awale: { pitsPerPlayer: AWALE_PITS_PER_PLAYER, seedsPerPit: AWALE_SEEDS_PER_PIT }
+      awale: { pitsPerPlayer: AWALE_PITS_PER_PLAYER, seedsPerPit: AWALE_SEEDS_PER_PIT },
+      twentyOne: { startingLives: TWENTY_ONE_STARTING_LIVES, startingTarget: TWENTY_ONE_STARTING_TARGET }
     },
     turnPlayerId: room.players[room.turnIndex % room.players.length]?.id,
     pendingAttack: room.pendingAttack
@@ -672,8 +1028,34 @@ export function getVisibleState(room, playerId) {
       position: p.position,
       awaleSide: room.players.findIndex((player) => player.id === p.id),
       handCount: p.hand.length,
-      hand: p.id === playerId ? p.hand : undefined
+      hand: p.id === playerId ? p.hand : undefined,
+      twentyOne: p.twentyOne
+        ? {
+            lives: p.twentyOne.lives,
+            total: p.id === playerId
+              ? twentyOneTotal(p)
+              : p.twentyOne.cards.reduce((total, card) => total + (card.hidden ? 0 : card.value), 0),
+            stood: p.twentyOne.stood,
+            bless: p.twentyOne.bless,
+            cards: p.twentyOne.cards.map((card) => ({
+              id: card.id,
+              value: p.id === playerId || !card.hidden ? card.value : null,
+              hidden: card.hidden
+            })),
+            trumpCount: p.hand.length
+          }
+        : null
     })),
+    twentyOne: room.twentyOne
+      ? {
+          round: room.twentyOne.round,
+          target: room.twentyOne.target,
+          bet: room.twentyOne.bet,
+          numberDeckCount: room.twentyOne.numberDeck.length,
+          trumpDeckCount: room.twentyOne.trumpDeck.length,
+          winnerId: room.twentyOne.winnerId
+        }
+      : null,
     awale: room.awale
       ? {
           board: room.awale.board,

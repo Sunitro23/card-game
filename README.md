@@ -6,7 +6,7 @@ Ce dépôt contient un socle MVP orienté **jeu de cartes en temps réel** pour 
 
 - **client/** : interface React (Vite) qui n'envoie que des intentions.
 - **server/** : serveur Node.js + Socket.IO, source de vérité du jeu.
-- **Modes de jeu** : duel de cartes historique ou Awalé classique dans les mêmes rooms à 2 joueurs.
+- **Modes de jeu** : duel de cartes historique, Awalé classique ou Twenty One dans les mêmes rooms à 2 joueurs.
 - **state en RAM** : aucune persistance, toutes les parties sont perdues au redémarrage.
 
 ## Démarrage rapide
@@ -41,13 +41,17 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 
 ### Client -> serveur (intentions)
 
-- `room:create` `{ playerName, gameType? }` (`gameType` vaut `card_duel` par défaut ou `awale`)
+- `room:create` `{ playerName, gameType? }` (`gameType` vaut `card_duel` par défaut, `awale` ou `twenty_one`)
 - `room:join` `{ code, playerName }`
 - `game:start` `{ code }`
 - `turn:end` `{ code }`
 - `card:play` `{ code, cardId, targetPlayerId? }`
 - `combat:defend` `{ code, attackId, defenseCardId? }`
 - `awale:move` `{ pitIndex }`
+- `twentyone:draw-number`
+- `twentyone:draw-trump`
+- `twentyone:play-trump` `{ cardId }`
+- `twentyone:stand`
 - `game:abort`
 - `hand:mulligan` `{ code, cardIds }`
 
@@ -64,6 +68,15 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - Semis anti-horaire, avec règle du Kroo : si le trou de départ contient plus de 11 graines, il est sauté à chaque passage et reste vide.
 - Capture sur le camp adverse quand la dernière graine tombe dans un trou à 2 ou 3 graines, puis capture multiple sur les trous précédents valides.
 - Coups qui affament l'adversaire interdits, détection des boucles, score par graines capturées et abandon avec capture des graines restantes par l'adversaire.
+
+
+## Mode Twenty One intégré côté serveur
+
+- Duel 1 contre 1 en manches, avec 3 vies par joueur et une cible de base à 21.
+- Chaque joueur construit son total avec des cartes numériques; le meilleur total est celui le plus proche de la cible active.
+- Les Go For peuvent déplacer la cible vers 17, 24 ou 27, et le bet de la manche commence à 1.
+- Les Trumps Add Number, Go For, Bet et Deck sont jouables depuis la main : Add Number tente de récupérer une valeur précise, Bless peut sauver une mort, Destroy/Reincarnation annulent le dernier Trump adverse, et les Trumps Deck manipulent les dernières cartes numériques ou la pioche.
+- À la résolution d'une manche, le perdant perd le bet en vies; une égalité relance une nouvelle manche.
 
 ## Règles MVP intégrées côté serveur
 
