@@ -12,16 +12,19 @@ const socket = io(socketUrl, {
 
 const styles = {
   page: {
-    minHeight: "100vh",
+    width: "100%",
+    minHeight: "100dvh",
     padding: 14,
     fontFamily: "'Trebuchet MS', 'Inter', system-ui, sans-serif",
     background: "radial-gradient(circle at 50% 20%, #7ad4ff 0%, #5b8cff 38%, #4439a8 100%)",
     color: "#0d1021",
-    boxSizing: "border-box"
+    boxSizing: "border-box",
+    overflowX: "hidden"
   },
   panel: {
     margin: "0 auto",
-    maxWidth: 1060
+    maxWidth: 1060,
+    width: "100%"
   },
   homeCard: {
     background: "rgba(255,255,255,0.93)",
@@ -71,6 +74,7 @@ const styles = {
     boxShadow: "0 12px 30px rgba(8,8,26,0.2)"
   },
   board: {
+    width: "100%",
     borderRadius: 22,
     minHeight: 460,
     background: "radial-gradient(circle at center, #8fe8ff 0%, #67b6ff 46%, #4f74da 100%)",
@@ -78,7 +82,8 @@ const styles = {
     padding: 14,
     display: "grid",
     gridTemplateRows: "auto auto auto",
-    gap: 12
+    gap: 12,
+    overflow: "hidden"
   },
   centerArena: {
     display: "flex",
@@ -797,11 +802,16 @@ function App() {
   }
 
   return (
-    <main style={{ ...styles.page, padding: isMobilePortrait ? 6 : isMobile ? 8 : isMobileLandscape ? 4 : styles.page.padding }}>
+    <main style={{ ...styles.page, padding: isMobilePortrait ? 0 : isMobile ? 6 : isMobileLandscape ? 4 : styles.page.padding }}>
       <style>{`
-        html, body, #root { margin: 0; min-height: 100%; }
+        html, body, #root { margin: 0; min-height: 100%; width: 100%; }
+        body { overflow-x: hidden; }
         * { box-sizing: border-box; }
-        button, input { font: inherit; }
+        button, input { font: inherit; max-width: 100%; }
+        @media (max-width: 700px) and (orientation: portrait) {
+          button { min-height: 40px; }
+          input { min-height: 40px; width: 100%; }
+        }
         @keyframes defense-pop {
           0% { transform: scale(0.92) translateY(12px); opacity: 0; }
           100% { transform: scale(1) translateY(0); opacity: 1; }
@@ -831,9 +841,16 @@ function App() {
           100% { transform: scale(1); }
         }
       `}</style>
-      <div style={{ ...styles.panel, maxWidth: isMobileLandscape ? "none" : styles.panel.maxWidth, width: "100%" }}>
+      <div
+        style={{
+          ...styles.panel,
+          maxWidth: isMobilePortrait || isMobileLandscape ? "none" : styles.panel.maxWidth,
+          margin: isMobilePortrait ? 0 : styles.panel.margin,
+          width: "100%"
+        }}
+      >
         {!state && (
-          <section style={styles.homeCard}>
+          <section style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 12 : styles.homeCard.padding }}>
             <strong style={{ fontSize: 20 }}>Salle de jeux</strong>
             <span>Crée une room ou rejoins une room existante, puis joue au duel de cartes ou à l'Awalé.</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
@@ -857,20 +874,21 @@ function App() {
                 </button>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={handleCreateRoom}>Créer une room {gameType === "awale" ? "Awalé" : "Duel"}</button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>
+              <button style={{ flex: isMobilePortrait ? "1 1 100%" : undefined }} onClick={handleCreateRoom}>Créer une room {gameType === "awale" ? "Awalé" : "Duel"}</button>
               <input
                 value={code}
                 placeholder="Code room"
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
+                style={{ flex: isMobilePortrait ? "1 1 54%" : undefined }}
               />
-              <button onClick={handleJoinRoom}>Rejoindre</button>
+              <button style={{ flex: isMobilePortrait ? "1 1 38%" : undefined }} onClick={handleJoinRoom}>Rejoindre</button>
             </div>
           </section>
         )}
 
         {state && isLobbyPhase && (
-          <section style={styles.homeCard}>
+          <section style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 12 : styles.homeCard.padding }}>
             <strong style={{ fontSize: 20 }}>Lobby</strong>
             <p style={{ margin: 0 }}>
               Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : "Duel de cartes"} · En attente des joueurs.
@@ -896,7 +914,7 @@ function App() {
         )}
 
         {state && !isLobbyPhase && isAwaleGame && (
-          <section style={{ display: "grid", gap: 10 }}>
+          <section style={{ display: "grid", gap: isMobilePortrait ? 8 : 10, width: "100%" }}>
             <div
               style={{
                 ...styles.awaleScoreBar,
@@ -928,8 +946,8 @@ function App() {
               style={{
                 ...styles.awaleBoard,
                 borderRadius: isMobilePortrait ? 18 : styles.awaleBoard.borderRadius,
-                padding: isMobilePortrait ? 8 : isMobile ? 10 : isMobileLandscape ? 8 : styles.awaleBoard.padding,
-                gap: isMobilePortrait ? 6 : isMobileLandscape ? 10 : styles.awaleBoard.gap
+                padding: isMobilePortrait ? 6 : isMobile ? 10 : isMobileLandscape ? 8 : styles.awaleBoard.padding,
+                gap: isMobilePortrait ? 5 : isMobileLandscape ? 10 : styles.awaleBoard.gap
               }}
             >
               <div style={{ ...styles.awaleRowWrap, gap: isMobilePortrait ? 3 : styles.awaleRowWrap.gap }}>
@@ -938,7 +956,7 @@ function App() {
                   style={{
                     ...styles.awaleRow,
                     gridTemplateColumns: isMobilePortrait ? "repeat(6, minmax(0, 1fr))" : styles.awaleRow.gridTemplateColumns,
-                    gap: isMobilePortrait ? 5 : isMobileLandscape ? 12 : styles.awaleRow.gap
+                    gap: isMobilePortrait ? 3 : isMobileLandscape ? 12 : styles.awaleRow.gap
                   }}
                 >
                   {awaleRows.opponentRow.map((pitIndex) => (
@@ -966,7 +984,7 @@ function App() {
                   style={{
                     ...styles.awaleRow,
                     gridTemplateColumns: isMobilePortrait ? "repeat(6, minmax(0, 1fr))" : styles.awaleRow.gridTemplateColumns,
-                    gap: isMobilePortrait ? 5 : isMobileLandscape ? 12 : styles.awaleRow.gap
+                    gap: isMobilePortrait ? 3 : isMobileLandscape ? 12 : styles.awaleRow.gap
                   }}
                 >
                   {awaleRows.myRow.map((pitIndex) => {
@@ -1014,11 +1032,19 @@ function App() {
         )}
 
         {state && !isLobbyPhase && !isAwaleGame && (
-          <section style={{ ...styles.board, minHeight: isMobile ? 380 : styles.board.minHeight, padding: isMobile ? 10 : styles.board.padding }}>
+          <section
+            style={{
+              ...styles.board,
+              minHeight: isMobilePortrait ? "calc(100dvh - 210px)" : isMobile ? 380 : styles.board.minHeight,
+              borderRadius: isMobilePortrait ? 14 : styles.board.borderRadius,
+              padding: isMobilePortrait ? 6 : isMobile ? 10 : styles.board.padding,
+              gap: isMobilePortrait ? 8 : styles.board.gap
+            }}
+          >
             <div>
               {opponents[0] ? (
                 <>
-                  <div style={styles.playerBadge}>
+                  <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
                     {opponents[0].name} · HP {opponents[0].hp} · Énergie {opponents[0].energy}/{state.config.maxEnergy} · {opponents[0].handCount} cartes
                   </div>
                   <div style={styles.opponentHand}>
@@ -1060,12 +1086,22 @@ function App() {
                   </div>
                 </>
               ) : (
-                <div style={styles.playerBadge}>En attente d'un adversaire...</div>
+                <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize }}>En attente d'un adversaire...</div>
               )}
             </div>
 
             <div style={styles.centerArena}>
-              <div style={{ ...styles.centerPanel, minHeight: isMobile ? 126 : styles.centerPanel.minHeight, gap: isMobile ? 8 : styles.centerPanel.gap }}>
+              <div
+                style={{
+                  ...styles.centerPanel,
+                  width: "100%",
+                  minHeight: isMobilePortrait ? 106 : isMobile ? 126 : styles.centerPanel.minHeight,
+                  borderRadius: isMobilePortrait ? 16 : styles.centerPanel.borderRadius,
+                  gap: isMobilePortrait ? 6 : isMobile ? 8 : styles.centerPanel.gap,
+                  padding: isMobilePortrait ? 8 : styles.centerPanel.padding,
+                  flexWrap: "wrap"
+                }}
+              >
                 <div style={styles.deckActions}>
                   <button
                     type="button"
@@ -1073,8 +1109,8 @@ function App() {
                     disabled={!isMyTurn || Boolean(pendingAttack)}
                     style={{
                       ...styles.drawDeckButton,
-                      width: isMobile ? 98 : styles.drawDeckButton.width,
-                      minHeight: isMobile ? 124 : styles.drawDeckButton.minHeight,
+                      width: isMobilePortrait ? 104 : isMobile ? 98 : styles.drawDeckButton.width,
+                      minHeight: isMobilePortrait ? 116 : isMobile ? 124 : styles.drawDeckButton.minHeight,
                       opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
                     }}
                     title="Clique pour piocher une carte utilitaire/défense (1 énergie)."
@@ -1097,7 +1133,7 @@ function App() {
                   </button>
                 </div>
                 {pendingAttack && (
-                  <div style={{ ...styles.arenaSlot, width: isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
+                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 66 : isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
                     {`${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}`}
                   </div>
                 )}
@@ -1106,10 +1142,10 @@ function App() {
 
             {me && (
               <div>
-                <div style={styles.playerBadge}>
+                <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
                   {me.name} · HP {me.hp} · Énergie {me.energy}/{state.config.maxEnergy}
                 </div>
-                <div style={{ ...styles.handRow, minHeight: isMobile ? 124 : styles.handRow.minHeight, gap: isMobile ? 6 : styles.handRow.gap }}>
+                <div style={{ ...styles.handRow, minHeight: isMobilePortrait ? 132 : isMobile ? 124 : styles.handRow.minHeight, gap: isMobilePortrait ? 5 : isMobile ? 6 : styles.handRow.gap, padding: isMobilePortrait ? "8px 0" : styles.handRow.padding }}>
                   {me.hand.map((card, index) => {
                     const palette = cardPalette(card);
                     const isActive = activeCardId === card.id;
@@ -1120,8 +1156,8 @@ function App() {
                         type="button"
                         style={{
                           ...styles.cardButton,
-                          width: isMobile ? 96 : styles.cardButton.width,
-                          minHeight: isMobile ? 124 : styles.cardButton.minHeight,
+                          width: isMobilePortrait ? "clamp(104px, 31vw, 118px)" : isMobile ? 96 : styles.cardButton.width,
+                          minHeight: isMobilePortrait ? 136 : isMobile ? 124 : styles.cardButton.minHeight,
                           background: palette.bg,
                           transform: isActive
                             ? "translateY(-18px) scale(1.05)"
@@ -1146,7 +1182,7 @@ function App() {
                           <span>{card.type === "defense" ? "DEF" : "UTIL"}</span>
                           <span>{palette.icon}</span>
                         </div>
-                        <div style={styles.cardMain}>{palette.icon}</div>
+                        <div style={{ ...styles.cardMain, fontSize: isMobilePortrait ? 30 : styles.cardMain.fontSize }}>{palette.icon}</div>
                         <div style={styles.cardSub}>{cardLabel(card)}</div>
                         <div style={styles.small}>{cardDetails(card)}</div>
                         {isActive && card.type === "utility" && isMyTurn && !pendingAttack && (
@@ -1164,10 +1200,10 @@ function App() {
         )}
 
         {state && !isLobbyPhase && !isAwaleGame && (
-          <section style={styles.controls}>
+          <section style={{ ...styles.controls, marginTop: isMobilePortrait ? 8 : styles.controls.marginTop, padding: isMobilePortrait ? 8 : styles.controls.padding, borderRadius: isMobilePortrait ? 12 : styles.controls.borderRadius }}>
             <div>
               <strong>Actions de tour</strong>
-              <div style={{ ...styles.actionCards, gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : styles.actionCards.gridTemplateColumns }}>
+              <div style={{ ...styles.actionCards, gridTemplateColumns: isMobilePortrait ? "repeat(3, minmax(0, 1fr))" : isMobile ? "repeat(2, minmax(0, 1fr))" : styles.actionCards.gridTemplateColumns, gap: isMobilePortrait ? 6 : styles.actionCards.gap }}>
                 {["ranged", "magic", "melee"].map((attackType) => {
                   const theme = attackCardTheme(attackType);
                   return (
@@ -1178,7 +1214,8 @@ function App() {
                       style={{
                         ...styles.actionCardButton,
                         background: theme.bg,
-                        minHeight: isMobile ? 94 : styles.actionCardButton.minHeight,
+                        minHeight: isMobilePortrait ? 86 : isMobile ? 94 : styles.actionCardButton.minHeight,
+                        padding: isMobilePortrait ? 7 : styles.actionCardButton.padding,
                         opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
                       }}
                     >
@@ -1194,7 +1231,7 @@ function App() {
         )}
 
         {state && !isLobbyPhase && (
-          <section style={styles.log}>
+          <section style={{ ...styles.log, marginTop: isMobilePortrait ? 8 : styles.log.marginTop, maxHeight: isMobilePortrait ? 130 : styles.log.maxHeight, fontSize: isMobilePortrait ? 12 : styles.log.fontSize }}>
             <strong>Journal</strong>
             <ul>
               {state.log.map((entry, idx) => (
