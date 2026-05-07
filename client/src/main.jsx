@@ -299,19 +299,6 @@ const styles = {
     overflow: "hidden",
     transition: "transform 180ms ease, filter 180ms ease, opacity 180ms ease"
   },
-  awalePitLabel: {
-    position: "absolute",
-    left: "50%",
-    bottom: 6,
-    transform: "translateX(-50%)",
-    zIndex: 3,
-    borderRadius: 999,
-    background: "rgba(48, 24, 8, 0.72)",
-    padding: "2px 7px",
-    fontSize: 10,
-    letterSpacing: 0.2,
-    boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
-  },
   awaleSeedLayer: {
     position: "absolute",
     inset: 8,
@@ -326,22 +313,6 @@ const styles = {
     background: "radial-gradient(circle at 34% 28%, #fff0b8 0 13%, #d99a42 34%, #8a4e1d 72%, #4a2410 100%)",
     boxShadow: "inset -2px -3px 4px rgba(59, 27, 8, 0.45), inset 2px 2px 3px rgba(255,255,255,0.38), 0 2px 3px rgba(31, 13, 4, 0.42)",
     transformOrigin: "center"
-  },
-  awaleCountBadge: {
-    position: "absolute",
-    top: 7,
-    right: 8,
-    zIndex: 4,
-    minWidth: 24,
-    height: 24,
-    borderRadius: 999,
-    background: "linear-gradient(135deg, #fff7c5, #ffcf5a)",
-    color: "#4a2410",
-    display: "grid",
-    placeItems: "center",
-    fontSize: 12,
-    boxShadow: "0 3px 6px rgba(0,0,0,0.25)",
-    border: "1px solid rgba(92, 45, 12, 0.38)"
   },
   awaleScoreBar: {
     borderRadius: 14,
@@ -523,7 +494,7 @@ function getAwaleSeedStyle(seedIndex, seedCount, isMobile, isAnimated) {
   };
 }
 
-function AwalePit({ pitIndex, seedCount, isMobile, isLegal, isMyTurn, isDisabled, lastMove, onPlay, isOpponent }) {
+function AwalePit({ pitIndex, seedCount, isMobile, isMobileLandscape, isLegal, isMyTurn, isDisabled, lastMove, onPlay, isOpponent }) {
   const isSource = lastMove?.fromPit === pitIndex;
   const sowStep = lastMove?.sowPath?.lastIndexOf(pitIndex) ?? -1;
   const isSown = sowStep >= 0;
@@ -538,7 +509,8 @@ function AwalePit({ pitIndex, seedCount, isMobile, isLegal, isMyTurn, isDisabled
       disabled={isDisabled}
       style={{
         ...styles.awalePit,
-        minHeight: isMobile ? 72 : styles.awalePit.minHeight,
+        minHeight: isMobile ? 72 : isMobileLandscape ? 116 : styles.awalePit.minHeight,
+        aspectRatio: isMobileLandscape ? "1.18 / 1" : undefined,
         outline: isLegal && isMyTurn ? "3px solid #fff78a" : "none",
         opacity: isDisabled ? (isOpponent ? 0.88 : 0.68) : 1,
         cursor: isDisabled ? "default" : "pointer",
@@ -549,7 +521,6 @@ function AwalePit({ pitIndex, seedCount, isMobile, isLegal, isMyTurn, isDisabled
       }}
       aria-label={`Trou ${pitIndex + 1}, ${seedCount} graine${seedCount > 1 ? "s" : ""}`}
     >
-      <span style={styles.awaleCountBadge}>{seedCount}</span>
       <span style={styles.awaleSeedLayer} aria-hidden="true">
         {Array.from({ length: seedCount }).map((_, seedIndex) => (
           <span
@@ -558,7 +529,6 @@ function AwalePit({ pitIndex, seedCount, isMobile, isLegal, isMyTurn, isDisabled
           />
         ))}
       </span>
-      <span style={styles.awalePitLabel}>Trou {pitIndex + 1}</span>
     </button>
   );
 }
@@ -571,15 +541,25 @@ function App() {
   const [error, setError] = React.useState("");
   const [activeCardId, setActiveCardId] = React.useState(null);
   const [defenseToast, setDefenseToast] = React.useState("");
-  const [isMobile, setIsMobile] = React.useState(() => window.matchMedia("(max-width: 700px)").matches);
+  const getViewportState = React.useCallback(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight
+  }), []);
+  const [viewport, setViewport] = React.useState(getViewportState);
 
   React.useEffect(() => {
-    const query = window.matchMedia("(max-width: 700px)");
-    const onChange = (event) => setIsMobile(event.matches);
-    query.addEventListener("change", onChange);
-    setIsMobile(query.matches);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+    const onResize = () => setViewport(getViewportState());
+    window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    onResize();
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+    };
+  }, [getViewportState]);
+
+  const isMobile = viewport.width <= 700;
+  const isMobileLandscape = viewport.width <= 950 && viewport.height <= 520 && viewport.width > viewport.height;
 
   React.useEffect(() => {
     const onRoomState = (nextState) => {
@@ -726,7 +706,7 @@ function App() {
   }
 
   return (
-    <main style={{ ...styles.page, padding: isMobile ? 8 : styles.page.padding }}>
+    <main style={{ ...styles.page, padding: isMobile ? 8 : isMobileLandscape ? 4 : styles.page.padding }}>
       <style>{`
         @keyframes defense-pop {
           0% { transform: scale(0.92) translateY(12px); opacity: 0; }
@@ -757,7 +737,7 @@ function App() {
           100% { transform: scale(1); }
         }
       `}</style>
-      <div style={styles.panel}>
+      <div style={{ ...styles.panel, maxWidth: isMobileLandscape ? "none" : styles.panel.maxWidth, width: "100%" }}>
         {!state && (
           <section style={styles.homeCard}>
             <strong style={{ fontSize: 20 }}>Salle de jeux</strong>
@@ -833,14 +813,21 @@ function App() {
               <button onClick={abortCurrentGame} disabled={state.phase === "finished"}>Abandonner</button>
             </div>
 
-            <div style={{ ...styles.awaleBoard, padding: isMobile ? 10 : styles.awaleBoard.padding }}>
-              <div style={styles.awaleRow}>
+            <div
+              style={{
+                ...styles.awaleBoard,
+                padding: isMobile ? 10 : isMobileLandscape ? 8 : styles.awaleBoard.padding,
+                gap: isMobileLandscape ? 10 : styles.awaleBoard.gap
+              }}
+            >
+              <div style={{ ...styles.awaleRow, gap: isMobileLandscape ? 12 : styles.awaleRow.gap }}>
                 {awaleRows.opponentRow.map((pitIndex) => (
                   <AwalePit
                     key={pitIndex}
                     pitIndex={pitIndex}
                     seedCount={state.awale.board[pitIndex]}
                     isMobile={isMobile}
+                    isMobileLandscape={isMobileLandscape}
                     isLegal={false}
                     isMyTurn={false}
                     isDisabled
@@ -854,7 +841,7 @@ function App() {
                 Sens de semis: anti-horaire · {isMyTurn && state.phase !== "finished" ? "Choisis un trou de ton camp" : state.phase === "finished" ? "Partie terminée" : "Tour adverse"}
               </div>
 
-              <div style={styles.awaleRow}>
+              <div style={{ ...styles.awaleRow, gap: isMobileLandscape ? 12 : styles.awaleRow.gap }}>
                 {awaleRows.myRow.map((pitIndex) => {
                   const isLegal = state.awale?.legalMoves?.includes(pitIndex);
                   return (
@@ -863,6 +850,7 @@ function App() {
                       pitIndex={pitIndex}
                       seedCount={state.awale.board[pitIndex]}
                       isMobile={isMobile}
+                      isMobileLandscape={isMobileLandscape}
                       isLegal={isLegal}
                       isMyTurn={isMyTurn}
                       isDisabled={!isMyTurn || state.phase === "finished" || !isLegal}
