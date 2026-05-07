@@ -283,7 +283,7 @@ const styles = {
     gap: 10
   },
   awalePit: {
-    minHeight: 86,
+    minHeight: 100,
     borderRadius: "999px",
     border: "3px solid rgba(70, 35, 10, 0.42)",
     background: "radial-gradient(circle at 50% 62%, #5d3519 0%, #8b542a 42%, #c88443 100%)",
@@ -294,7 +294,54 @@ const styles = {
     display: "grid",
     placeItems: "center",
     gap: 2,
-    padding: 8
+    padding: 8,
+    position: "relative",
+    overflow: "hidden",
+    transition: "transform 180ms ease, filter 180ms ease, opacity 180ms ease"
+  },
+  awalePitLabel: {
+    position: "absolute",
+    left: "50%",
+    bottom: 6,
+    transform: "translateX(-50%)",
+    zIndex: 3,
+    borderRadius: 999,
+    background: "rgba(48, 24, 8, 0.72)",
+    padding: "2px 7px",
+    fontSize: 10,
+    letterSpacing: 0.2,
+    boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
+  },
+  awaleSeedLayer: {
+    position: "absolute",
+    inset: 8,
+    zIndex: 2,
+    pointerEvents: "none"
+  },
+  awaleSeed: {
+    position: "absolute",
+    width: 14,
+    height: 19,
+    borderRadius: "55% 45% 52% 48%",
+    background: "radial-gradient(circle at 34% 28%, #fff0b8 0 13%, #d99a42 34%, #8a4e1d 72%, #4a2410 100%)",
+    boxShadow: "inset -2px -3px 4px rgba(59, 27, 8, 0.45), inset 2px 2px 3px rgba(255,255,255,0.38), 0 2px 3px rgba(31, 13, 4, 0.42)",
+    transformOrigin: "center"
+  },
+  awaleCountBadge: {
+    position: "absolute",
+    top: 7,
+    right: 8,
+    zIndex: 4,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 999,
+    background: "linear-gradient(135deg, #fff7c5, #ffcf5a)",
+    color: "#4a2410",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 12,
+    boxShadow: "0 3px 6px rgba(0,0,0,0.25)",
+    border: "1px solid rgba(92, 45, 12, 0.38)"
   },
   awaleScoreBar: {
     borderRadius: 14,
@@ -446,6 +493,74 @@ function getAwaleRowsForViewer(state, me) {
     myRow: sideIndexes(mySide),
     opponentRow: [...sideIndexes(opponentSide)].reverse()
   };
+}
+
+
+const AWALE_SEED_POSITIONS = [
+  [48, 44, -18], [36, 56, 18], [59, 58, 43], [63, 36, -35], [26, 41, 55], [43, 29, 7],
+  [72, 49, 71], [30, 65, -62], [52, 69, 12], [20, 52, 27], [78, 36, -12], [38, 76, -28],
+  [58, 22, 31], [68, 68, -51], [24, 28, -7], [47, 83, 48], [83, 55, 16], [16, 68, -39],
+  [34, 19, 66], [74, 22, -66], [55, 50, 4], [42, 63, -47], [66, 80, 39], [18, 38, 13],
+  [88, 44, -27], [29, 82, 24], [50, 14, -44], [12, 54, 61], [61, 91, -5], [76, 72, 52],
+  [22, 16, -18], [86, 66, 28], [40, 90, -70], [11, 78, 42], [91, 29, -4], [32, 50, -52],
+  [70, 13, 19], [49, 37, -73], [58, 74, 74], [26, 72, 8], [79, 87, -36], [17, 24, 36],
+  [93, 77, 60], [7, 43, -21], [36, 7, 50], [64, 6, -58], [4, 67, 16], [96, 52, -48]
+];
+
+function getAwaleSeedStyle(seedIndex, seedCount, isMobile, isAnimated) {
+  const [x, y, rotation] = AWALE_SEED_POSITIONS[seedIndex % AWALE_SEED_POSITIONS.length];
+  const ring = Math.floor(seedIndex / AWALE_SEED_POSITIONS.length);
+  const scale = Math.max(0.64, (isMobile ? 0.78 : 1) - ring * 0.08 - Math.max(0, seedCount - 18) * 0.006);
+  return {
+    ...styles.awaleSeed,
+    width: isMobile ? 11 : styles.awaleSeed.width,
+    height: isMobile ? 15 : styles.awaleSeed.height,
+    left: `${x}%`,
+    top: `${y}%`,
+    transform: `translate(-50%, -50%) rotate(${rotation + ring * 23}deg) scale(${scale})`,
+    zIndex: seedIndex,
+    animation: isAnimated ? `awale-seed-drop 420ms ease-out ${Math.min(seedIndex, 12) * 22}ms both` : undefined
+  };
+}
+
+function AwalePit({ pitIndex, seedCount, isMobile, isLegal, isMyTurn, isDisabled, lastMove, onPlay, isOpponent }) {
+  const isSource = lastMove?.fromPit === pitIndex;
+  const sowStep = lastMove?.sowPath?.lastIndexOf(pitIndex) ?? -1;
+  const isSown = sowStep >= 0;
+  const isCaptured = lastMove?.capturedPits?.includes(pitIndex);
+  const isLastPit = lastMove?.lastPit === pitIndex;
+  const animationName = isCaptured ? "awale-capture-pulse" : isSource ? "awale-source-lift" : isSown || isLastPit ? "awale-pit-pulse" : undefined;
+
+  return (
+    <button
+      type="button"
+      onClick={onPlay}
+      disabled={isDisabled}
+      style={{
+        ...styles.awalePit,
+        minHeight: isMobile ? 72 : styles.awalePit.minHeight,
+        outline: isLegal && isMyTurn ? "3px solid #fff78a" : "none",
+        opacity: isDisabled ? (isOpponent ? 0.88 : 0.68) : 1,
+        cursor: isDisabled ? "default" : "pointer",
+        transform: isLegal && isMyTurn && !isDisabled ? "translateY(-2px)" : undefined,
+        filter: isCaptured ? "brightness(1.18) saturate(1.2)" : undefined,
+        animation: animationName ? `${animationName} 560ms ease-out` : undefined,
+        animationDelay: isSown ? `${Math.min(sowStep, 14) * 42}ms` : undefined
+      }}
+      aria-label={`Trou ${pitIndex + 1}, ${seedCount} graine${seedCount > 1 ? "s" : ""}`}
+    >
+      <span style={styles.awaleCountBadge}>{seedCount}</span>
+      <span style={styles.awaleSeedLayer} aria-hidden="true">
+        {Array.from({ length: seedCount }).map((_, seedIndex) => (
+          <span
+            key={`${pitIndex}-${lastMove?.id ?? "initial"}-${seedIndex}`}
+            style={getAwaleSeedStyle(seedIndex, seedCount, isMobile, isSown || isSource || isCaptured)}
+          />
+        ))}
+      </span>
+      <span style={styles.awalePitLabel}>Trou {pitIndex + 1}</span>
+    </button>
+  );
 }
 
 function App() {
@@ -621,6 +736,26 @@ function App() {
           0% { transform: translateX(-50%) translateY(10px); opacity: 0; }
           100% { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
+        @keyframes awale-seed-drop {
+          0% { opacity: 0; transform: translate(-50%, -80%) rotate(var(--seed-rotation, 0deg)) scale(0.35); }
+          68% { opacity: 1; transform: translate(-50%, -43%) rotate(var(--seed-rotation, 0deg)) scale(1.12); }
+          100% { opacity: 1; }
+        }
+        @keyframes awale-pit-pulse {
+          0% { transform: scale(1); box-shadow: inset 0 10px 18px rgba(0,0,0,0.34), 0 6px 12px rgba(35, 18, 5, 0.28); }
+          45% { transform: scale(1.045); box-shadow: inset 0 10px 18px rgba(0,0,0,0.24), 0 0 0 6px rgba(255,247,138,0.28), 0 10px 18px rgba(35, 18, 5, 0.34); }
+          100% { transform: scale(1); }
+        }
+        @keyframes awale-source-lift {
+          0% { transform: translateY(0) scale(1); }
+          35% { transform: translateY(-7px) scale(1.035); filter: brightness(1.16); }
+          100% { transform: translateY(0) scale(1); }
+        }
+        @keyframes awale-capture-pulse {
+          0% { transform: scale(1); }
+          45% { transform: scale(0.94); box-shadow: inset 0 10px 18px rgba(0,0,0,0.22), 0 0 0 7px rgba(255,108,88,0.36), 0 10px 18px rgba(35, 18, 5, 0.34); }
+          100% { transform: scale(1); }
+        }
       `}</style>
       <div style={styles.panel}>
         {!state && (
@@ -701,20 +836,17 @@ function App() {
             <div style={{ ...styles.awaleBoard, padding: isMobile ? 10 : styles.awaleBoard.padding }}>
               <div style={styles.awaleRow}>
                 {awaleRows.opponentRow.map((pitIndex) => (
-                  <button
+                  <AwalePit
                     key={pitIndex}
-                    type="button"
-                    disabled
-                    style={{
-                      ...styles.awalePit,
-                      minHeight: isMobile ? 62 : styles.awalePit.minHeight,
-                      opacity: 0.86,
-                      cursor: "default"
-                    }}
-                  >
-                    <span style={{ fontSize: isMobile ? 22 : 30 }}>{state.awale.board[pitIndex]}</span>
-                    <span style={{ fontSize: 10 }}>Trou {pitIndex + 1}</span>
-                  </button>
+                    pitIndex={pitIndex}
+                    seedCount={state.awale.board[pitIndex]}
+                    isMobile={isMobile}
+                    isLegal={false}
+                    isMyTurn={false}
+                    isDisabled
+                    isOpponent
+                    lastMove={state.awale.lastMove}
+                  />
                 ))}
               </div>
 
@@ -726,21 +858,17 @@ function App() {
                 {awaleRows.myRow.map((pitIndex) => {
                   const isLegal = state.awale?.legalMoves?.includes(pitIndex);
                   return (
-                    <button
+                    <AwalePit
                       key={pitIndex}
-                      type="button"
-                      onClick={() => playAwalePit(pitIndex)}
-                      disabled={!isMyTurn || state.phase === "finished" || !isLegal}
-                      style={{
-                        ...styles.awalePit,
-                        minHeight: isMobile ? 62 : styles.awalePit.minHeight,
-                        outline: isLegal && isMyTurn ? "3px solid #fff78a" : "none",
-                        opacity: !isMyTurn || state.phase === "finished" || !isLegal ? 0.68 : 1
-                      }}
-                    >
-                      <span style={{ fontSize: isMobile ? 22 : 30 }}>{state.awale.board[pitIndex]}</span>
-                      <span style={{ fontSize: 10 }}>Trou {pitIndex + 1}</span>
-                    </button>
+                      pitIndex={pitIndex}
+                      seedCount={state.awale.board[pitIndex]}
+                      isMobile={isMobile}
+                      isLegal={isLegal}
+                      isMyTurn={isMyTurn}
+                      isDisabled={!isMyTurn || state.phase === "finished" || !isLegal}
+                      lastMove={state.awale.lastMove}
+                      onPlay={() => playAwalePit(pitIndex)}
+                    />
                   );
                 })}
               </div>

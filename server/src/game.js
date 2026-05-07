@@ -206,6 +206,7 @@ function getPlayerSide(room, playerId) {
 
 function simulateAwaleMove(board, side, pitIndex) {
   const nextBoard = [...board];
+  const sowPath = [];
   let seeds = nextBoard[pitIndex];
   nextBoard[pitIndex] = 0;
   let cursor = pitIndex;
@@ -214,6 +215,7 @@ function simulateAwaleMove(board, side, pitIndex) {
     cursor = (cursor + 1) % AWALE_TOTAL_PITS;
     if (cursor === pitIndex) continue;
     nextBoard[cursor] += 1;
+    sowPath.push(cursor);
     seeds -= 1;
   }
 
@@ -230,7 +232,7 @@ function simulateAwaleMove(board, side, pitIndex) {
   const capturedSeeds = capturedPits.reduce((total, capturedPit) => total + nextBoard[capturedPit], 0);
   for (const capturedPit of capturedPits) nextBoard[capturedPit] = 0;
 
-  return { board: nextBoard, capturedPits, capturedSeeds, lastPit: cursor };
+  return { board: nextBoard, capturedPits, capturedSeeds, lastPit: cursor, sowPath };
 }
 
 function getLegalAwaleMoves(room, side) {
@@ -312,7 +314,8 @@ export function startGame(code, requesterPlayerId) {
       captured: [0, 0],
       history: new Set(),
       finishedReason: null,
-      winnerSide: null
+      winnerSide: null,
+      lastMove: null
     };
     room.awale.history.add(awaleStateKey(room));
     room.log.push({
@@ -366,6 +369,16 @@ export function playAwaleMove(code, playerId, pitIndex) {
   const result = simulateAwaleMove(room.awale.board, side, normalizedPitIndex);
   room.awale.board = result.board;
   room.awale.captured[side] += result.capturedSeeds;
+  room.awale.lastMove = {
+    id: uid("awale_move"),
+    playerId: actor.id,
+    side,
+    fromPit: normalizedPitIndex,
+    sowPath: result.sowPath,
+    lastPit: result.lastPit,
+    capturedPits: result.capturedPits,
+    capturedSeeds: result.capturedSeeds
+  };
 
   const captureText = result.capturedSeeds > 0 ? ` et capture ${result.capturedSeeds} graine(s)` : "";
   const krooText = startingSeeds > 11 ? " (Kroo)" : "";
@@ -667,7 +680,8 @@ export function getVisibleState(room, playerId) {
           captured: room.awale.captured,
           legalMoves: viewer ? getLegalAwaleMoves(room, getPlayerSide(room, playerId)) : [],
           finishedReason: room.awale.finishedReason,
-          winnerSide: room.awale.winnerSide
+          winnerSide: room.awale.winnerSide,
+          lastMove: room.awale.lastMove
         }
       : null,
     opponentHandPreview: viewer?.status.visionActive && opponent
