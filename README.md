@@ -6,6 +6,7 @@ Ce dépôt contient un socle MVP orienté **jeu de cartes en temps réel** pour 
 
 - **client/** : interface React (Vite) qui n'envoie que des intentions.
 - **server/** : serveur Node.js + Socket.IO, source de vérité du jeu.
+- **Modes de jeu** : duel de cartes historique ou Awalé classique dans les mêmes rooms à 2 joueurs.
 - **state en RAM** : aucune persistance, toutes les parties sont perdues au redémarrage.
 
 ## Démarrage rapide
@@ -40,12 +41,14 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 
 ### Client -> serveur (intentions)
 
-- `room:create` `{ playerName }`
+- `room:create` `{ playerName, gameType? }` (`gameType` vaut `card_duel` par défaut ou `awale`)
 - `room:join` `{ code, playerName }`
 - `game:start` `{ code }`
 - `turn:end` `{ code }`
 - `card:play` `{ code, cardId, targetPlayerId? }`
 - `combat:defend` `{ code, attackId, defenseCardId? }`
+- `awale:move` `{ pitIndex }`
+- `game:abort`
 - `hand:mulligan` `{ code, cardIds }`
 
 ### Serveur -> client
@@ -53,6 +56,14 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - `room:state` : état filtré par joueur
 - `game:event` : journal d'actions
 - `game:error` : erreurs métier
+
+## Mode Awalé classique intégré côté serveur
+
+- Plateau de 12 trous, 48 graines au départ (4 par trou).
+- Premier joueur tiré au hasard dans la room.
+- Semis anti-horaire, avec règle du Kroo : si le trou de départ contient plus de 11 graines, il est sauté à chaque passage et reste vide.
+- Capture sur le camp adverse quand la dernière graine tombe dans un trou à 2 ou 3 graines, puis capture multiple sur les trous précédents valides.
+- Coups qui affament l'adversaire interdits, détection des boucles, score par graines capturées et abandon avec capture des graines restantes par l'adversaire.
 
 ## Règles MVP intégrées côté serveur
 

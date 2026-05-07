@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import {
+  abortGame,
   createRoom,
   endTurn,
   getVisibleState,
@@ -9,6 +10,7 @@ import {
   playCard,
   performAttack,
   drawCard,
+  playAwaleMove,
   resolveDefense,
   rooms,
   startGame,
@@ -46,9 +48,9 @@ function onError(socket, err) {
 }
 
 io.on("connection", (socket) => {
-  socket.on("room:create", ({ playerName }) => {
+  socket.on("room:create", ({ playerName, gameType }) => {
     try {
-      const room = createRoom(socket.id, playerName || "Joueur 1");
+      const room = createRoom(socket.id, playerName || "Joueur 1", gameType);
       socket.join(room.code);
       emitRoomState(room.code);
     } catch (err) {
@@ -72,6 +74,29 @@ io.on("connection", (socket) => {
       if (!ref) throw new Error("Joueur inconnu.");
       startGame(code, ref.playerId);
       emitRoomState(code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+
+  socket.on("awale:move", ({ pitIndex }) => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      playAwaleMove(ref.code, ref.playerId, pitIndex);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("game:abort", () => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      abortGame(ref.code, ref.playerId);
+      emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);
     }

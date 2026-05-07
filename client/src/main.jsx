@@ -44,6 +44,21 @@ const styles = {
     padding: "8px 10px",
     fontWeight: 700
   },
+  gameChoice: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: 10
+  },
+  gameChoiceButton: {
+    border: "2px solid rgba(10,20,40,0.16)",
+    borderRadius: 14,
+    padding: 12,
+    background: "rgba(255,255,255,0.74)",
+    textAlign: "left",
+    cursor: "pointer",
+    display: "grid",
+    gap: 4
+  },
   lobby: {
     background: "rgba(255,255,255,0.9)",
     borderRadius: 16,
@@ -254,6 +269,51 @@ const styles = {
     fontWeight: 700,
     opacity: 0.9
   },
+  awaleBoard: {
+    borderRadius: 22,
+    background: "linear-gradient(135deg, #8b5a2b, #d19a52 48%, #7a431c)",
+    boxShadow: "inset 0 0 0 4px rgba(70, 35, 10, 0.34), 0 16px 28px rgba(28, 16, 8, 0.32)",
+    padding: 14,
+    display: "grid",
+    gap: 12
+  },
+  awaleRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(6, minmax(44px, 1fr))",
+    gap: 10
+  },
+  awalePit: {
+    minHeight: 86,
+    borderRadius: "999px",
+    border: "3px solid rgba(70, 35, 10, 0.42)",
+    background: "radial-gradient(circle at 50% 62%, #5d3519 0%, #8b542a 42%, #c88443 100%)",
+    color: "#fff8dd",
+    boxShadow: "inset 0 10px 18px rgba(0,0,0,0.34), 0 6px 12px rgba(35, 18, 5, 0.28)",
+    fontWeight: 900,
+    cursor: "pointer",
+    display: "grid",
+    placeItems: "center",
+    gap: 2,
+    padding: 8
+  },
+  awaleScoreBar: {
+    borderRadius: 14,
+    background: "rgba(255,255,255,0.88)",
+    padding: 10,
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    fontWeight: 800
+  },
+  ruleBox: {
+    borderRadius: 14,
+    background: "rgba(255,255,255,0.9)",
+    padding: 12,
+    display: "grid",
+    gap: 6,
+    fontSize: 13
+  },
   log: {
     marginTop: 10,
     maxHeight: 180,
@@ -377,9 +437,21 @@ function previewCardFromVision(rawCard) {
   return null;
 }
 
+function getAwaleRowsForViewer(state, me) {
+  if (!state?.awale?.board || !me) return { myRow: [], opponentRow: [] };
+  const mySide = me.awaleSide;
+  const opponentSide = mySide === 0 ? 1 : 0;
+  const sideIndexes = (side) => (side === 0 ? [0, 1, 2, 3, 4, 5] : [6, 7, 8, 9, 10, 11]);
+  return {
+    myRow: sideIndexes(mySide),
+    opponentRow: [...sideIndexes(opponentSide)].reverse()
+  };
+}
+
 function App() {
   const [name, setName] = React.useState("Joueur");
   const [code, setCode] = React.useState("");
+  const [gameType, setGameType] = React.useState("card_duel");
   const [state, setState] = React.useState(null);
   const [error, setError] = React.useState("");
   const [activeCardId, setActiveCardId] = React.useState(null);
@@ -427,6 +499,7 @@ function App() {
   const isMyTurn = Boolean(state && me && state.turnPlayerId === me.id);
   const isMyDefenseTurn = Boolean(pendingAttack && me && pendingAttack.targetId === me.id);
   const isLobbyPhase = state?.phase === "lobby";
+  const isAwaleGame = state?.gameType === "awale";
   const isHost = Boolean(state && me && state.hostPlayerId === me.id);
   const defenseCards = React.useMemo(
     () => me?.hand?.filter((c) => c.type === "defense") ?? [],
@@ -442,6 +515,8 @@ function App() {
     if (!pendingAttack) return [];
     return defenseCards.filter((card) => !canDefenseCardAnswerAttack(card, pendingAttack.card.type));
   }, [defenseCards, pendingAttack]);
+
+  const awaleRows = React.useMemo(() => getAwaleRowsForViewer(state, me), [state, me]);
 
   React.useEffect(() => {
     if (!me) {
@@ -472,7 +547,7 @@ function App() {
   function handleCreateRoom() {
     ensureConnection();
     setError("");
-    socket.emit("room:create", { playerName: name.trim() || "Joueur" });
+    socket.emit("room:create", { playerName: name.trim() || "Joueur", gameType });
   }
 
   function handleJoinRoom() {
@@ -514,6 +589,14 @@ function App() {
     socket.emit("combat:defend", {});
   }
 
+  function playAwalePit(pitIndex) {
+    socket.emit("awale:move", { pitIndex });
+  }
+
+  function abortCurrentGame() {
+    socket.emit("game:abort");
+  }
+
   function handleCardClick(card) {
     if (activeCardId === card.id) {
       if (card.type === "utility" && isMyTurn && !pendingAttack) {
@@ -542,11 +625,31 @@ function App() {
       <div style={styles.panel}>
         {!state && (
           <section style={styles.homeCard}>
-            <strong style={{ fontSize: 20 }}>Card Game MVP</strong>
-            <span>Crée une room ou rejoins une room existante.</span>
+            <strong style={{ fontSize: 20 }}>Salle de jeux</strong>
+            <span>Crée une room ou rejoins une room existante, puis joue au duel de cartes ou à l'Awalé.</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
+            <div style={styles.gameChoice}>
+              {[
+                { id: "card_duel", title: "Duel de cartes", desc: "Le combat temps réel existant." },
+                { id: "awale", title: "Awalé classique", desc: "12 trous, 48 graines, captures par 2 ou 3." }
+              ].map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  onClick={() => setGameType(choice.id)}
+                  style={{
+                    ...styles.gameChoiceButton,
+                    border: gameType === choice.id ? "2px solid #4f46e5" : styles.gameChoiceButton.border,
+                    boxShadow: gameType === choice.id ? "0 0 0 3px rgba(79, 70, 229, 0.18)" : "none"
+                  }}
+                >
+                  <strong>{choice.title}</strong>
+                  <span style={styles.small}>{choice.desc}</span>
+                </button>
+              ))}
+            </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={handleCreateRoom}>Créer une room</button>
+              <button onClick={handleCreateRoom}>Créer une room {gameType === "awale" ? "Awalé" : "Duel"}</button>
               <input
                 value={code}
                 placeholder="Code room"
@@ -561,7 +664,7 @@ function App() {
           <section style={styles.homeCard}>
             <strong style={{ fontSize: 20 }}>Lobby</strong>
             <p style={{ margin: 0 }}>
-              Room <strong>{state.code}</strong> · En attente des joueurs.
+              Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : "Duel de cartes"} · En attente des joueurs.
             </p>
             <ul style={styles.lobbyPlayers}>
               {state.players.map((player) => (
@@ -583,7 +686,82 @@ function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && (
+        {state && !isLobbyPhase && isAwaleGame && (
+          <section style={{ display: "grid", gap: 10 }}>
+            <div style={styles.awaleScoreBar}>
+              {state.players.map((player) => (
+                <span key={player.id}>
+                  {player.name}: {state.awale?.captured?.[player.awaleSide] ?? 0} graine(s) capturée(s)
+                  {state.turnPlayerId === player.id && state.phase !== "finished" ? " · à jouer" : ""}
+                </span>
+              ))}
+              <button onClick={abortCurrentGame} disabled={state.phase === "finished"}>Abandonner</button>
+            </div>
+
+            <div style={{ ...styles.awaleBoard, padding: isMobile ? 10 : styles.awaleBoard.padding }}>
+              <div style={styles.awaleRow}>
+                {awaleRows.opponentRow.map((pitIndex) => (
+                  <button
+                    key={pitIndex}
+                    type="button"
+                    disabled
+                    style={{
+                      ...styles.awalePit,
+                      minHeight: isMobile ? 62 : styles.awalePit.minHeight,
+                      opacity: 0.86,
+                      cursor: "default"
+                    }}
+                  >
+                    <span style={{ fontSize: isMobile ? 22 : 30 }}>{state.awale.board[pitIndex]}</span>
+                    <span style={{ fontSize: 10 }}>Trou {pitIndex + 1}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ textAlign: "center", color: "#fff8dd", fontWeight: 900, textShadow: "0 2px 5px rgba(0,0,0,0.35)" }}>
+                Sens de semis: anti-horaire · {isMyTurn && state.phase !== "finished" ? "Choisis un trou de ton camp" : state.phase === "finished" ? "Partie terminée" : "Tour adverse"}
+              </div>
+
+              <div style={styles.awaleRow}>
+                {awaleRows.myRow.map((pitIndex) => {
+                  const isLegal = state.awale?.legalMoves?.includes(pitIndex);
+                  return (
+                    <button
+                      key={pitIndex}
+                      type="button"
+                      onClick={() => playAwalePit(pitIndex)}
+                      disabled={!isMyTurn || state.phase === "finished" || !isLegal}
+                      style={{
+                        ...styles.awalePit,
+                        minHeight: isMobile ? 62 : styles.awalePit.minHeight,
+                        outline: isLegal && isMyTurn ? "3px solid #fff78a" : "none",
+                        opacity: !isMyTurn || state.phase === "finished" || !isLegal ? 0.68 : 1
+                      }}
+                    >
+                      <span style={{ fontSize: isMobile ? 22 : 30 }}>{state.awale.board[pitIndex]}</span>
+                      <span style={{ fontSize: 10 }}>Trou {pitIndex + 1}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <section style={styles.ruleBox}>
+              <strong>Règles Awalé classique intégrées</strong>
+              <span>Chaque joueur sème depuis ses 6 trous. Une dernière graine chez l'adversaire capture le trou s'il contient 2 ou 3 graines, puis les trous précédents valides.</span>
+              <span>Un Kroo (plus de 11 graines) saute toujours le trou de départ. Les coups qui affament l'adversaire sont bloqués. Les boucles terminent la partie sans capturer les graines restantes.</span>
+              {state.phase === "finished" && (
+                <strong>
+                  {state.awale?.winnerSide === null
+                    ? "Égalité."
+                    : `${state.players.find((player) => player.awaleSide === state.awale?.winnerSide)?.name} gagne.`}
+                </strong>
+              )}
+            </section>
+          </section>
+        )}
+
+        {state && !isLobbyPhase && !isAwaleGame && (
           <section style={{ ...styles.board, minHeight: isMobile ? 380 : styles.board.minHeight, padding: isMobile ? 10 : styles.board.padding }}>
             <div>
               {opponents[0] ? (
@@ -733,7 +911,7 @@ function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && (
+        {state && !isLobbyPhase && !isAwaleGame && (
           <section style={styles.controls}>
             <div>
               <strong>Actions de tour</strong>
@@ -774,7 +952,7 @@ function App() {
           </section>
         )}
 
-        {!isLobbyPhase && isMyDefenseTurn && (
+        {!isLobbyPhase && !isAwaleGame && isMyDefenseTurn && (
           <div style={styles.modalBackdrop}>
             <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding, animation: "defense-pop 220ms ease-out" }}>
               <h3 style={{ margin: 0 }}>🛡 Défense requise</h3>
