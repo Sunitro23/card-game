@@ -380,6 +380,27 @@ const styles = {
     gap: 6,
     fontSize: 13
   },
+  twentyOneTargetPanel: {
+    borderRadius: 18,
+    background: "linear-gradient(135deg, #fff5bc, #ffc857)",
+    color: "#17204a",
+    padding: "12px 16px",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: 10,
+    boxShadow: "0 12px 24px rgba(8, 12, 28, 0.24)",
+    border: "3px solid rgba(255,255,255,0.88)"
+  },
+  twentyOneTargetMetric: {
+    display: "grid",
+    gap: 2,
+    textAlign: "center"
+  },
+  twentyOneMetricValue: {
+    fontSize: 30,
+    fontWeight: 950,
+    lineHeight: 1
+  },
   log: {
     marginTop: 10,
     maxHeight: 180,
@@ -479,10 +500,10 @@ function cardDetails(card) {
     if (card.action === "one_up") return "Augmente le bet de +1.";
     if (card.action === "shield") return "Diminue le bet de -1.";
     if (card.action === "bless") return "Te sauve si tu devais mourir.";
-    if (card.action === "bloodshed") return "Pioche 1 Trump et bet +1.";
+    if (card.action === "bloodshed") return "Bet +1, sans pioche de Trump.";
     if (card.action === "destroy") return "Détruit le dernier Trump adverse.";
-    if (card.action === "friendship") return "Les deux joueurs piochent 2 Trumps.";
-    if (card.action === "reincarnation") return "Destroy + pioche 1 Trump.";
+    if (card.action === "friendship") return "Effet sans pioche de Trump.";
+    if (card.action === "reincarnation") return "Destroy, sans pioche de Trump.";
     if (card.action === "hush") return "Pioche une carte numérique cachée.";
     if (card.action === "perfect_draw") return "Meilleure carte sûre vers la cible.";
     if (card.action === "refresh") return "Reset tes cartes numériques puis pioche 2.";
@@ -657,6 +678,7 @@ function App() {
   const [error, setError] = React.useState("");
   const [activeCardId, setActiveCardId] = React.useState(null);
   const [defenseToast, setDefenseToast] = React.useState("");
+  const [trumpPopup, setTrumpPopup] = React.useState(null);
   const getViewportState = React.useCallback(() => ({
     width: window.innerWidth,
     height: window.innerHeight
@@ -753,6 +775,15 @@ function App() {
     }
   }, [state?.log]);
 
+  React.useEffect(() => {
+    const lastLog = state?.log?.[state.log.length - 1];
+    if (lastLog?.type !== "twenty_one_trump") return;
+
+    setTrumpPopup(lastLog);
+    const timer = setTimeout(() => setTrumpPopup(null), 3200);
+    return () => clearTimeout(timer);
+  }, [state?.log]);
+
   function ensureConnection() {
     if (!socket.connected) socket.connect();
   }
@@ -810,10 +841,6 @@ function App() {
     socket.emit("twentyone:draw-number");
   }
 
-  function drawTwentyOneTrump() {
-    socket.emit("twentyone:draw-trump");
-  }
-
   function standTwentyOne() {
     socket.emit("twentyone:stand");
   }
@@ -829,7 +856,7 @@ function App() {
 
   function handleCardClick(card) {
     if (activeCardId === card.id) {
-      if (card.type === "trump" && isTwentyOneGame && isMyTurn) {
+      if (card.type === "trump" && isTwentyOneGame && state?.phase !== "finished") {
         playTwentyOneTrump(card.id);
       } else if (card.type === "utility" && isMyTurn && !pendingAttack) {
         playCard(card.id, opponents[0]?.id);
@@ -860,6 +887,10 @@ function App() {
         @keyframes defense-toast-in {
           0% { transform: translateX(-50%) translateY(10px); opacity: 0; }
           100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        @keyframes trump-popup-pop {
+          0% { transform: translateY(14px) scale(0.9); opacity: 0; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
         }
         @keyframes awale-seed-drop {
           0% { opacity: 0; transform: translate(-50%, -80%) rotate(var(--seed-rotation, 0deg)) scale(0.35); }
@@ -1078,9 +1109,24 @@ function App() {
           <section style={{ display: "grid", gap: isMobilePortrait ? 8 : 12, width: "100%" }}>
             <div style={{ ...styles.awaleScoreBar, alignItems: "center" }}>
               <strong>Twenty One · Manche {state.twentyOne?.round}</strong>
-              <span>Cible: {state.twentyOne?.target} · Bet: {state.twentyOne?.bet}</span>
-              <span>Deck: {state.twentyOne?.numberDeckCount} cartes · Trumps: {state.twentyOne?.trumpDeckCount}</span>
+              <span>Actions libres : pas de gestion des tours.</span>
+              <span>Trumps initiaux uniquement : {me?.hand?.length ?? 0}/3 en main</span>
               <button onClick={abortCurrentGame} disabled={state.phase === "finished"}>Abandonner</button>
+            </div>
+
+            <div style={styles.twentyOneTargetPanel}>
+              <div style={styles.twentyOneTargetMetric}>
+                <span>Numéro requis / cible</span>
+                <strong style={styles.twentyOneMetricValue}>{state.twentyOne?.target}</strong>
+              </div>
+              <div style={styles.twentyOneTargetMetric}>
+                <span>Bet en vies</span>
+                <strong style={styles.twentyOneMetricValue}>{state.twentyOne?.bet}</strong>
+              </div>
+              <div style={styles.twentyOneTargetMetric}>
+                <span>Cartes numériques restantes</span>
+                <strong style={styles.twentyOneMetricValue}>{state.twentyOne?.numberDeckCount}</strong>
+              </div>
             </div>
 
             <div style={{ ...styles.board, minHeight: "auto", gridTemplateRows: "auto auto auto", background: "radial-gradient(circle at center, #242b62 0%, #17204a 55%, #11162f 100%)" }}>
@@ -1092,7 +1138,7 @@ function App() {
                   <div key={player.id} style={{ display: "grid", gap: 8 }}>
                     <div style={{ ...styles.playerBadge, justifyContent: "space-between", flexWrap: "wrap" }}>
                       <span>{player.name} · {player.twentyOne?.lives} vie(s) · Total {total}{busted ? " · bust" : ""}</span>
-                      <span>{player.twentyOne?.stood ? "Stand" : state.turnPlayerId === player.id && state.phase !== "finished" ? "À jouer" : "En attente"}{player.twentyOne?.bless ? " · Bless" : ""}</span>
+                      <span>{Math.max(0, (state.twentyOne?.target ?? 21) - total)} requis · {player.twentyOne?.cards?.length ?? 0} carte(s){player.twentyOne?.stood ? " · Stand" : " · Actif"}{player.twentyOne?.bless ? " · Bless" : ""}</span>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
                       {(player.twentyOne?.cards ?? []).map((card, index) => (
@@ -1108,15 +1154,15 @@ function App() {
               })}
 
               <div style={{ ...styles.centerPanel, width: "100%", color: "#fff", justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={drawTwentyOneNumber} disabled={!isMyTurn || state.phase === "finished"} style={{ ...styles.drawDeckButton, opacity: !isMyTurn || state.phase === "finished" ? 0.6 : 1 }}>
+                <button onClick={drawTwentyOneNumber} disabled={me?.twentyOne?.stood || state.phase === "finished"} style={{ ...styles.drawDeckButton, opacity: me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1 }}>
                   <div style={styles.actionIcon}>🂡</div>
                   <div>Carte normale</div>
+                  <div style={{ fontSize: 11, opacity: 0.9 }}>À volonté</div>
                 </button>
-                <button onClick={drawTwentyOneTrump} disabled={!isMyTurn || state.phase === "finished"} style={{ ...styles.drawDeckButton, background: "linear-gradient(140deg, #151d44, #8d4dff)", opacity: !isMyTurn || state.phase === "finished" ? 0.6 : 1 }}>
-                  <div style={styles.actionIcon}>♛</div>
-                  <div>Piocher Trump</div>
-                </button>
-                <button onClick={standTwentyOne} disabled={!isMyTurn || state.phase === "finished"} style={{ ...styles.skipTurnButton, width: 96, borderRadius: 16, opacity: !isMyTurn || state.phase === "finished" ? 0.6 : 1 }}>
+                <div style={{ ...styles.arenaSlot, minHeight: 92 }}>
+                  ♛ Trumps non piochables : 3 reçus au départ, aucun autre tirage.
+                </div>
+                <button onClick={standTwentyOne} disabled={me?.twentyOne?.stood || state.phase === "finished"} style={{ ...styles.skipTurnButton, width: 96, borderRadius: 16, opacity: me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1 }}>
                   Stand
                 </button>
               </div>
@@ -1140,7 +1186,7 @@ function App() {
                             minHeight: isMobilePortrait ? 138 : isMobile ? 132 : styles.cardButton.minHeight,
                             background: palette.bg,
                             transform: isActive ? "translateY(-18px) scale(1.05)" : `rotate(${tilt}deg)`,
-                            opacity: !isMyTurn && !isActive ? 0.72 : 1
+                            opacity: me?.twentyOne?.stood && !isActive ? 0.72 : 1
                           }}
                           title="Clique une fois pour sélectionner, re-clique pour jouer ce Trump."
                         >
@@ -1148,7 +1194,7 @@ function App() {
                           <div style={{ ...styles.cardMain, fontSize: 30 }}>{palette.icon}</div>
                           <div style={styles.cardSub}>{cardLabel(card)}</div>
                           <div style={styles.small}>{cardDetails(card)}</div>
-                          {isActive && isMyTurn && <div style={{ fontSize: 11, marginTop: 2, fontWeight: 700 }}>Re-clique pour jouer</div>}
+                          {isActive && !me?.twentyOne?.stood && state.phase !== "finished" && <div style={{ fontSize: 11, marginTop: 2, fontWeight: 700 }}>Re-clique pour jouer</div>}
                         </button>
                       );
                     })}
@@ -1161,7 +1207,8 @@ function App() {
               <strong>Règles Twenty One intégrées</strong>
               <span>Chaque manche vise la cible active (21 par défaut). Les Go For peuvent la changer en 17, 24 ou 27.</span>
               <span>Le meilleur total est le plus proche de la cible. Le perdant de la manche perd le bet en vies; Bless peut empêcher une mort.</span>
-              <span>Les Trumps Add Number, Go For, Bet et Deck sont jouables depuis ta main pendant ton tour.</span>
+              <span>Les joueurs peuvent piocher des cartes numériques et jouer leurs Trumps librement, sans tour imposé.</span>
+              <span>Les Trumps ne sont pas piochables : chaque joueur en reçoit 3 au début, puis aucun autre tirage de Trump n'est ajouté.</span>
               {state.phase === "finished" && <strong>{state.players.find((player) => player.id === state.twentyOne?.winnerId)?.name ?? "Un joueur"} gagne.</strong>}
             </section>
           </section>
@@ -1443,6 +1490,17 @@ function App() {
 
         {defenseToast && (
           <div style={styles.defenseToast}>{defenseToast}</div>
+        )}
+
+        {trumpPopup && (
+          <div style={styles.modalBackdrop}>
+            <div style={{ ...styles.modal, maxWidth: 440, textAlign: "center", animation: "trump-popup-pop 220ms ease-out" }}>
+              <div style={{ fontSize: 42, lineHeight: 1 }}>♛</div>
+              <h3 style={{ margin: "6px 0" }}>Trump joué</h3>
+              <strong style={{ fontSize: 22 }}>{trumpPopup.card?.name ?? "Trump"}</strong>
+              <p style={{ marginBottom: 0 }}>{trumpPopup.message}</p>
+            </div>
+          </div>
         )}
 
         {error && <p style={{ color: "#8b0000", fontWeight: 700 }}>{error}</p>}

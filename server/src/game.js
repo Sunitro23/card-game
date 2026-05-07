@@ -342,17 +342,9 @@ function resolveTwentyOneRound(room) {
   room.log.push({ at: Date.now(), type: "twenty_one_round_start", message: `Manche ${room.twentyOne.round} lancée. Cible 21, bet 1.` });
 }
 
-function advanceTwentyOneTurn(room) {
+function checkTwentyOneRoundResolution(room) {
   if (room.phase !== "twenty_one") return;
-  if (room.players.every((player) => player.twentyOne.stood)) {
-    resolveTwentyOneRound(room);
-    return;
-  }
-  for (let step = 0; step < room.players.length; step += 1) {
-    room.turnIndex = (room.turnIndex + 1) % room.players.length;
-    if (!getCurrentPlayer(room).twentyOne.stood) break;
-  }
-  if (room.phase === "twenty_one") room.log.push({ at: Date.now(), type: "turn_started", message: `Tour de ${getCurrentPlayer(room).name}.` });
+  if (room.players.every((player) => player.twentyOne.stood)) resolveTwentyOneRound(room);
 }
 
 function isAwaleSidePit(pitIndex, side) {
@@ -525,7 +517,7 @@ export function startGame(code, requesterPlayerId) {
       p.twentyOne = twentyOnePlayerState();
       drawTwentyOneTrump(room, p, TWENTY_ONE_STARTING_TRUMPS);
     });
-    room.log.push({ at: Date.now(), type: "game_started", message: `Twenty One lancé. Cible 21, bet 1. ${getCurrentPlayer(room).name} joue en premier.` });
+    room.log.push({ at: Date.now(), type: "game_started", message: `Twenty One lancé. Cible 21, bet 1. Chaque joueur peut agir librement, sans tour imposé.` });
     return room;
   }
 
@@ -670,8 +662,7 @@ export function drawTwentyOneNumberCard(code, playerId) {
   if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
 
   const actor = room.players.find((p) => p.id === playerId);
-  const current = getCurrentPlayer(room);
-  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (!actor) throw new Error("Joueur introuvable.");
   if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
 
   const card = drawTwentyOneNumber(room, actor);
@@ -679,7 +670,7 @@ export function drawTwentyOneNumberCard(code, playerId) {
   room.log.push({ at: Date.now(), type: "twenty_one_draw", message: `${actor.name} pioche une carte numérique.` });
 
   if (twentyOneTotal(actor) > room.twentyOne.target) actor.twentyOne.stood = true;
-  advanceTwentyOneTurn(room);
+  checkTwentyOneRoundResolution(room);
   return room;
 }
 
@@ -687,17 +678,8 @@ export function drawTwentyOneTrumpCard(code, playerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
   if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
-
-  const actor = room.players.find((p) => p.id === playerId);
-  const current = getCurrentPlayer(room);
-  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
-  if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
-
-  const drawn = drawTwentyOneTrump(room, actor, 1);
-  if (!drawn.length) throw new Error("Deck Trump vide.");
-  room.log.push({ at: Date.now(), type: "twenty_one_trump_draw", message: `${actor.name} pioche 1 Trump.` });
-  advanceTwentyOneTurn(room);
-  return room;
+  if (!room.players.some((p) => p.id === playerId)) throw new Error("Joueur introuvable.");
+  throw new Error("Les Trumps ne sont pas piochables : chaque joueur reçoit uniquement 3 Trumps au début.");
 }
 
 export function standTwentyOne(code, playerId) {
@@ -706,11 +688,11 @@ export function standTwentyOne(code, playerId) {
   if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
 
   const actor = room.players.find((p) => p.id === playerId);
-  const current = getCurrentPlayer(room);
-  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (!actor) throw new Error("Joueur introuvable.");
+  if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
   actor.twentyOne.stood = true;
   room.log.push({ at: Date.now(), type: "twenty_one_stand", message: `${actor.name} stand à ${twentyOneTotal(actor)}.` });
-  advanceTwentyOneTurn(room);
+  checkTwentyOneRoundResolution(room);
   return room;
 }
 
@@ -720,8 +702,7 @@ export function playTwentyOneTrump(code, playerId, cardId) {
   if (room.phase !== "twenty_one") throw new Error("Twenty One n'est pas en cours.");
 
   const actor = room.players.find((p) => p.id === playerId);
-  const current = getCurrentPlayer(room);
-  if (!actor || current.id !== actor.id) throw new Error("Ce n'est pas votre tour.");
+  if (!actor) throw new Error("Joueur introuvable.");
   if (actor.twentyOne.stood) throw new Error("Vous avez déjà stand.");
   const opponent = getOpponent(room, actor.id);
   if (!opponent) throw new Error("Aucun adversaire.");
@@ -746,18 +727,17 @@ export function playTwentyOneTrump(code, playerId, cardId) {
     if (card.action === "shield") room.twentyOne.bet = Math.max(0, room.twentyOne.bet - 1);
     if (card.action === "bless") actor.twentyOne.bless = true;
     if (card.action === "bloodshed") {
-      drawTwentyOneTrump(room, actor, 1);
       room.twentyOne.bet += 1;
+      message = `${actor.name} joue Bloodshed : bet +1. Aucun Trump supplémentaire n'est pioché.`;
     }
     if (card.action === "destroy") {
       consumed = Boolean(destroyLastOpponentTrump(room, actor, opponent));
       message = consumed ? message : `${actor.name} joue Destroy, mais aucun Trump adverse ne peut être détruit.`;
     }
-    if (card.action === "friendship") drawTwentyOneTrump(room, actor, 2), drawTwentyOneTrump(room, opponent, 2);
+    if (card.action === "friendship") message = `${actor.name} joue Friendship. Aucun Trump supplémentaire n'est pioché.`;
     if (card.action === "reincarnation") {
       consumed = Boolean(destroyLastOpponentTrump(room, actor, opponent));
-      if (consumed) drawTwentyOneTrump(room, actor, 1);
-      message = consumed ? `${actor.name} joue Reincarnation, détruit le dernier Trump adverse et pioche 1 Trump.` : `${actor.name} joue Reincarnation, mais aucun Trump adverse ne peut être détruit.`;
+      message = consumed ? `${actor.name} joue Reincarnation et détruit le dernier Trump adverse. Aucun Trump supplémentaire n'est pioché.` : `${actor.name} joue Reincarnation, mais aucun Trump adverse ne peut être détruit.`;
     }
   } else if (card.trumpType === "deck") {
     if (card.action === "hush") drawTwentyOneNumber(room, actor, { hidden: true });
@@ -798,10 +778,10 @@ export function playTwentyOneTrump(code, playerId, cardId) {
 
   actor.discard.push(card);
   if (consumed) actor.twentyOne.lastTrump = card;
-  room.log.push({ at: Date.now(), type: "twenty_one_trump", message });
+  room.log.push({ at: Date.now(), type: "twenty_one_trump", message, playerId: actor.id, card: { name: card.name, trumpType: card.trumpType, action: card.action, value: card.value, target: card.target } });
   if (twentyOneTotal(actor) > room.twentyOne.target) actor.twentyOne.stood = true;
   if (twentyOneTotal(opponent) > room.twentyOne.target) opponent.twentyOne.stood = true;
-  advanceTwentyOneTurn(room);
+  checkTwentyOneRoundResolution(room);
   return room;
 }
 
