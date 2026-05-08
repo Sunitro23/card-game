@@ -6,7 +6,7 @@ const remoteHost = process.env.VITE_REMOTE_HOST;
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "127.0.0.1",
+    host: remoteHost ? true : "127.0.0.1",
     port: 5173,
     strictPort: true,
     allowedHosts: remoteHost ? [remoteHost] : [],
@@ -19,7 +19,7 @@ export default defineConfig({
       : undefined
   },
   preview: {
-    host: "127.0.0.1",
+    host: remoteHost ? true : "127.0.0.1",
     allowedHosts: remoteHost ? [remoteHost] : []
   }
 });
