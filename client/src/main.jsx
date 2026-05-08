@@ -142,8 +142,8 @@ const styles = {
     outline: "none"
   },
   menuDescription: {
-    marginTop: -8,
-    padding: "0 10px 4px",
+    marginTop: 0,
+    padding: 0,
     color: "rgba(224, 206, 166, 0.68)",
     fontSize: 13,
     lineHeight: 1.4
@@ -162,6 +162,18 @@ const styles = {
     paddingTop: 10,
     color: "rgba(232, 216, 181, 0.58)",
     fontSize: 12
+  },
+  validateButton: {
+    width: "min(100%, 320px)",
+    justifySelf: "start",
+    marginTop: 2,
+    minHeight: 42,
+    border: "1px solid rgba(238, 149, 56, 0.74)",
+    background: "linear-gradient(90deg, rgba(126, 63, 24, 0.94), rgba(62, 28, 12, 0.86))",
+    color: "#fff0c9",
+    boxShadow: "inset 3px 0 0 rgba(238, 149, 56, 0.92), inset 0 0 22px rgba(109, 42, 15, 0.5), 0 10px 20px rgba(0,0,0,0.32)",
+    textAlign: "left",
+    justifyContent: "start"
   },
   lobbyPlayers: {
     margin: 0,
@@ -838,6 +850,7 @@ function App() {
   const [name, setName] = React.useState("Joueur");
   const [code, setCode] = React.useState("");
   const [gameType, setGameType] = React.useState("card_duel");
+  const [roomAction, setRoomAction] = React.useState("create");
   const [state, setState] = React.useState(null);
   const [error, setError] = React.useState("");
   const [activeCardId, setActiveCardId] = React.useState(null);
@@ -1182,7 +1195,90 @@ function App() {
               </label>
             </section>
 
-            <section style={styles.menuSection}>
+            <section style={styles.menuActions}>
+              <div style={styles.menuSectionTitle}>Actions</div>
+              <button
+                className="menu-row menu-action"
+                type="button"
+                onClick={() => setRoomAction("create")}
+                style={{
+                  ...styles.menuRow,
+                  ...styles.menuButtonRow,
+                  ...(roomAction === "create" ? styles.menuRowSelected : null)
+                }}
+              >
+                <span style={styles.menuLabel}>Creer une room</span>
+                <span style={styles.menuValue}>{roomAction === "create" ? "Sélectionné" : ""}</span>
+              </button>
+              <button
+                className="menu-row menu-action"
+                type="button"
+                onClick={() => setRoomAction("join")}
+                style={{
+                  ...styles.menuRow,
+                  ...styles.menuButtonRow,
+                  ...(roomAction === "join" ? styles.menuRowSelected : null)
+                }}
+              >
+                <span style={styles.menuLabel}>Rejoindre</span>
+                <span style={styles.menuValue}>{roomAction === "join" ? "Sélectionné" : ""}</span>
+              </button>
+            </section>
+
+            {roomAction === "create" ? (
+              <section style={styles.menuSection}>
+                <div style={styles.menuSectionTitle}>Mode de jeu</div>
+                {GAME_CHOICES.map((choice) => {
+                  const isSelected = gameType === choice.id;
+                  return (
+                    <button
+                      key={choice.id}
+                      className="menu-row"
+                      type="button"
+                      onClick={() => setGameType(choice.id)}
+                      style={{
+                        ...styles.menuRow,
+                        ...styles.menuButtonRow,
+                        alignItems: isSelected ? "start" : styles.menuRow.alignItems,
+                        ...(isSelected ? styles.menuRowSelected : null)
+                      }}
+                    >
+                      <span style={{ ...styles.menuLabel, display: "grid", gap: 3 }}>
+                        <span>{choice.title}</span>
+                        {isSelected && <span style={styles.menuDescription}>{choice.desc}</span>}
+                      </span>
+                      <span style={styles.menuValue}>{isSelected ? "Sélectionné" : ""}</span>
+                    </button>
+                  );
+                })}
+              </section>
+            ) : (
+              <section style={styles.menuSection}>
+                <div style={styles.menuSectionTitle}>Connexion / room</div>
+                <label className="menu-field" style={styles.menuRow}>
+                  <span style={styles.menuLabel}>Code room</span>
+                  <input
+                    className="menu-input"
+                    value={code}
+                    placeholder="____"
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    style={styles.menuInput}
+                  />
+                </label>
+              </section>
+            )}
+
+            <button
+              className="menu-row menu-action"
+              type="button"
+              onClick={roomAction === "create" ? handleCreateRoom : handleJoinRoom}
+              style={{ ...styles.menuRow, ...styles.menuButtonRow, ...styles.validateButton }}
+            >
+              Valider
+            </button>
+
+            {/* Legacy menu removed from display after the action-first flow. */}
+            <section style={{ display: "none" }}>
               <div style={styles.menuSectionTitle}>Mode de jeu</div>
               {GAME_CHOICES.map((choice) => {
                 const isSelected = gameType === choice.id;
@@ -1206,7 +1302,7 @@ function App() {
               <span style={styles.menuDescription}>{selectedMode.desc}</span>
             </section>
 
-            <section style={styles.menuSection}>
+            <section style={{ display: "none" }}>
               <div style={styles.menuSectionTitle}>Connexion / room</div>
               <label className="menu-field" style={styles.menuRow}>
                 <span style={styles.menuLabel}>Code room</span>
@@ -1220,7 +1316,7 @@ function App() {
               </label>
             </section>
 
-            <section style={styles.menuActions}>
+            <section style={{ display: "none" }}>
               <div style={styles.menuSectionTitle}>Actions</div>
               <button className="menu-row menu-action" type="button" onClick={handleCreateRoom} style={{ ...styles.menuRow, ...styles.menuButtonRow }}>
                 <span style={styles.menuLabel}>Creer une room</span>
