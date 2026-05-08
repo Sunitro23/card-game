@@ -10,16 +10,30 @@ const socket = io(socketUrl, {
   transports: ["websocket", "polling"]
 });
 
+const theme = {
+  ash: "#090806",
+  iron: "#1a1712",
+  panel: "rgba(18, 15, 11, 0.92)",
+  panelSoft: "rgba(30, 25, 18, 0.78)",
+  bone: "#d8c9a7",
+  ember: "#b85a24",
+  emberBright: "#f08a35",
+  blood: "#7d1010",
+  line: "rgba(216, 201, 167, 0.32)",
+  glow: "rgba(240, 138, 53, 0.34)"
+};
+
 const styles = {
   page: {
     width: "100%",
     minHeight: "100dvh",
     padding: 14,
-    fontFamily: "'Trebuchet MS', 'Inter', system-ui, sans-serif",
-    background: "radial-gradient(circle at 50% 20%, #7ad4ff 0%, #5b8cff 38%, #4439a8 100%)",
-    color: "#0d1021",
+    fontFamily: "'Cinzel', 'Georgia', 'Times New Roman', serif",
+    background: "radial-gradient(circle at 50% 0%, rgba(151, 86, 34, 0.34) 0%, transparent 28%), radial-gradient(circle at 12% 16%, rgba(226, 153, 67, 0.12) 0%, transparent 26%), linear-gradient(180deg, #17120d 0%, #090806 48%, #030302 100%)",
+    color: theme.bone,
     boxSizing: "border-box",
-    overflowX: "hidden"
+    overflowX: "hidden",
+    textShadow: "0 1px 2px rgba(0, 0, 0, 0.86)"
   },
   panel: {
     margin: "0 auto",
@@ -27,10 +41,11 @@ const styles = {
     width: "100%"
   },
   homeCard: {
-    background: "rgba(255,255,255,0.93)",
-    borderRadius: 18,
+    background: "linear-gradient(180deg, rgba(31, 27, 20, 0.96), rgba(12, 10, 8, 0.96))",
+    border: `1px solid ${theme.line}`,
+    borderRadius: 4,
     padding: 16,
-    boxShadow: "0 12px 30px rgba(8,8,26,0.2)",
+    boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.65), 0 18px 44px rgba(0,0,0,0.58), 0 0 30px ${theme.glow}`,
     display: "grid",
     gap: 10
   },
@@ -42,10 +57,12 @@ const styles = {
     gap: 8
   },
   lobbyPlayerItem: {
-    borderRadius: 10,
-    background: "rgba(12, 30, 68, 0.1)",
+    borderRadius: 3,
+    background: "linear-gradient(90deg, rgba(68, 52, 35, 0.68), rgba(20, 17, 13, 0.72))",
+    border: `1px solid ${theme.line}`,
     padding: "8px 10px",
-    fontWeight: 700
+    fontWeight: 700,
+    color: "#f1e5c8"
   },
   gameChoice: {
     display: "grid",
@@ -53,32 +70,35 @@ const styles = {
     gap: 10
   },
   gameChoiceButton: {
-    border: "2px solid rgba(10,20,40,0.16)",
-    borderRadius: 14,
+    border: `1px solid ${theme.line}`,
+    borderRadius: 3,
     padding: 12,
-    background: "rgba(255,255,255,0.74)",
+    background: "linear-gradient(180deg, rgba(39, 33, 24, 0.96), rgba(11, 10, 8, 0.96))",
+    color: theme.bone,
     textAlign: "left",
     cursor: "pointer",
     display: "grid",
     gap: 4
   },
   lobby: {
-    background: "rgba(255,255,255,0.9)",
-    borderRadius: 16,
+    background: theme.panel,
+    border: `1px solid ${theme.line}`,
+    borderRadius: 4,
     padding: 10,
     marginBottom: 10,
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
-    boxShadow: "0 12px 30px rgba(8,8,26,0.2)"
+    boxShadow: "0 14px 34px rgba(0,0,0,0.5)"
   },
   board: {
     width: "100%",
-    borderRadius: 22,
+    borderRadius: 4,
     minHeight: 460,
-    background: "radial-gradient(circle at center, #8fe8ff 0%, #67b6ff 46%, #4f74da 100%)",
-    boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.45), 0 14px 28px rgba(15,21,55,0.35)",
+    background: "radial-gradient(circle at 50% 35%, rgba(95, 65, 35, 0.38) 0%, rgba(22, 18, 13, 0.96) 42%, rgba(4, 4, 3, 0.98) 100%), repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 62px)",
+    border: `1px solid ${theme.line}`,
+    boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.82), inset 0 0 70px rgba(0,0,0,0.72), 0 18px 36px rgba(0,0,0,0.55)",
     padding: 14,
     display: "grid",
     gridTemplateRows: "auto auto auto",
@@ -91,11 +111,12 @@ const styles = {
     alignItems: "center"
   },
   centerPanel: {
-    borderRadius: 20,
+    borderRadius: 3,
     width: "min(100%, 640px)",
     minHeight: 150,
-    background: "linear-gradient(150deg, rgba(8, 21, 55, 0.86), rgba(17, 44, 105, 0.9))",
-    boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.35), 0 14px 28px rgba(12, 16, 38, 0.35)",
+    background: "linear-gradient(160deg, rgba(41, 34, 25, 0.92), rgba(8, 8, 7, 0.94))",
+    border: `1px solid ${theme.line}`,
+    boxShadow: "inset 0 0 42px rgba(0,0,0,0.74), 0 14px 28px rgba(0,0,0,0.48)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-around",
@@ -103,12 +124,12 @@ const styles = {
     padding: 14
   },
   arenaSlot: {
-    border: "3px solid #fefefe",
+    border: `1px solid ${theme.line}`,
     width: 170,
     minHeight: 94,
-    borderRadius: 12,
-    background: "rgba(14, 20, 41, 0.92)",
-    color: "#f4f4f4",
+    borderRadius: 3,
+    background: "linear-gradient(180deg, rgba(8, 8, 7, 0.94), rgba(38, 28, 19, 0.86))",
+    color: "#efe0bf",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -120,11 +141,11 @@ const styles = {
   drawDeckButton: {
     width: 122,
     minHeight: 152,
-    borderRadius: 14,
-    border: "3px solid #fff",
-    background: "linear-gradient(135deg, #26b06f, #168f9b)",
-    color: "#fff",
-    boxShadow: "0 10px 16px rgba(5, 18, 27, 0.45)",
+    borderRadius: 3,
+    border: `1px solid rgba(240, 138, 53, 0.56)`,
+    background: "radial-gradient(circle at 50% 24%, rgba(240, 138, 53, 0.38), transparent 38%), linear-gradient(160deg, #2d2116, #0b0907 78%)",
+    color: "#f4e7c8",
+    boxShadow: "inset 0 0 28px rgba(0,0,0,0.68), 0 10px 18px rgba(0,0,0,0.55)",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -142,10 +163,10 @@ const styles = {
   skipTurnButton: {
     width: 40,
     height: 40,
-    borderRadius: 999,
-    border: "2px solid #fff",
-    background: "linear-gradient(135deg, #ff8f5b, #ff4f6f)",
-    color: "#fff",
+    borderRadius: 3,
+    border: `1px solid rgba(240, 138, 53, 0.62)`,
+    background: `linear-gradient(160deg, ${theme.blood}, #2b0705)`,
+    color: "#f4e7c8",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -153,7 +174,7 @@ const styles = {
     fontWeight: 900,
     lineHeight: 1,
     padding: 0,
-    boxShadow: "0 8px 14px rgba(5, 18, 27, 0.38)",
+    boxShadow: "inset 0 0 18px rgba(0,0,0,0.6), 0 8px 14px rgba(0,0,0,0.48)",
     cursor: "pointer",
     transition: "transform 130ms ease, filter 130ms ease"
   },
@@ -161,13 +182,14 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    borderRadius: 999,
-    background: "rgba(10,20,40,0.78)",
-    color: "#fff",
+    borderRadius: 2,
+    background: "linear-gradient(90deg, rgba(11, 10, 8, 0.92), rgba(55, 41, 28, 0.76))",
+    border: `1px solid ${theme.line}`,
+    color: "#f4e7c8",
     padding: "7px 14px",
     fontSize: 13,
     marginBottom: 10,
-    boxShadow: "0 4px 10px rgba(5,7,16,0.3)"
+    boxShadow: "0 4px 14px rgba(0,0,0,0.46)"
   },
   handRow: {
     display: "flex",
@@ -188,23 +210,23 @@ const styles = {
   cardBack: {
     width: 56,
     height: 78,
-    borderRadius: 10,
-    border: "3px solid #f1f1f1",
-    background: "linear-gradient(140deg, #241f84, #5421b8)",
-    color: "#ffde59",
+    borderRadius: 3,
+    border: `1px solid rgba(216, 201, 167, 0.58)`,
+    background: "radial-gradient(circle at 50% 32%, rgba(240, 138, 53, 0.32), transparent 34%), linear-gradient(140deg, #282017, #060504)",
+    color: "#d9c58e",
     fontWeight: 900,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0 6px 0 rgba(8,9,20,0.35)"
+    boxShadow: "inset 0 0 20px rgba(0,0,0,0.72), 0 8px 14px rgba(0,0,0,0.46)"
   },
   cardButton: {
     width: 124,
     minHeight: 152,
-    borderRadius: 14,
-    border: "3px solid #fff",
-    color: "#fff",
-    boxShadow: "0 12px 16px rgba(16, 24, 46, 0.38)",
+    borderRadius: 3,
+    border: `1px solid rgba(229, 208, 156, 0.62)`,
+    color: "#f4e7c8",
+    boxShadow: "inset 0 0 24px rgba(0,0,0,0.64), 0 13px 18px rgba(0,0,0,0.55)",
     padding: "8px 8px 12px",
     cursor: "pointer",
     display: "flex",
@@ -217,13 +239,15 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     fontSize: 11,
-    opacity: 0.95
+    opacity: 0.95,
+    color: "#e7d5ad",
+    textTransform: "uppercase"
   },
   cardMain: {
     fontWeight: 900,
     fontSize: 28,
     lineHeight: 1,
-    textShadow: "0 2px 4px rgba(0,0,0,0.25)"
+    textShadow: `0 0 10px ${theme.glow}, 0 2px 4px rgba(0,0,0,0.9)`
   },
   cardSub: {
     fontSize: 12,
@@ -237,8 +261,9 @@ const styles = {
   controls: {
     marginTop: 10,
     padding: 12,
-    borderRadius: 14,
-    background: "rgba(255,255,255,0.9)",
+    borderRadius: 4,
+    background: theme.panel,
+    border: `1px solid ${theme.line}`,
     display: "grid",
     gap: 10
   },
@@ -250,11 +275,11 @@ const styles = {
   },
   actionCardButton: {
     minHeight: 110,
-    borderRadius: 14,
-    border: "3px solid #fff",
-    color: "#fff",
+    borderRadius: 3,
+    border: `1px solid rgba(229, 208, 156, 0.58)`,
+    color: "#f4e7c8",
     fontWeight: 800,
-    boxShadow: "0 10px 14px rgba(16, 24, 46, 0.32)",
+    boxShadow: "inset 0 0 22px rgba(0,0,0,0.62), 0 10px 16px rgba(0,0,0,0.45)",
     cursor: "pointer",
     transition: "transform 130ms ease, filter 130ms ease",
     padding: 10,
@@ -275,9 +300,10 @@ const styles = {
     opacity: 0.9
   },
   awaleBoard: {
-    borderRadius: 22,
-    background: "linear-gradient(135deg, #8b5a2b, #d19a52 48%, #7a431c)",
-    boxShadow: "inset 0 0 0 4px rgba(70, 35, 10, 0.34), 0 16px 28px rgba(28, 16, 8, 0.32)",
+    borderRadius: 4,
+    background: "radial-gradient(circle at 50% 18%, rgba(156, 91, 38, 0.38), transparent 34%), linear-gradient(135deg, #2d2117, #6b4428 46%, #15100c)",
+    border: `1px solid ${theme.line}`,
+    boxShadow: "inset 0 0 46px rgba(0,0,0,0.66), 0 16px 30px rgba(0,0,0,0.52)",
     padding: 14,
     display: "grid",
     gap: 12,
@@ -297,7 +323,7 @@ const styles = {
     gridTemplateColumns: "repeat(5, 1fr)",
     gap: 10,
     padding: "0 4%",
-    color: "#fff8dd",
+    color: "#e9d7ad",
     fontSize: 22,
     fontWeight: 900,
     lineHeight: 1,
@@ -323,20 +349,21 @@ const styles = {
   },
   awaleTurnHint: {
     borderRadius: 12,
-    background: "rgba(255, 248, 221, 0.92)",
-    color: "#4b260d",
+    background: "linear-gradient(90deg, rgba(55, 39, 25, 0.94), rgba(13, 11, 9, 0.94))",
+    color: "#f4e7c8",
+    border: `1px solid ${theme.line}`,
     padding: "8px 10px",
     textAlign: "center",
     fontWeight: 900,
-    boxShadow: "0 8px 14px rgba(35, 18, 5, 0.22)"
+    boxShadow: "0 8px 16px rgba(0,0,0,0.46)"
   },
   awalePit: {
     minHeight: 100,
     borderRadius: "999px",
-    border: "3px solid rgba(70, 35, 10, 0.42)",
-    background: "radial-gradient(circle at 50% 62%, #5d3519 0%, #8b542a 42%, #c88443 100%)",
+    border: "1px solid rgba(216, 201, 167, 0.34)",
+    background: "radial-gradient(circle at 50% 62%, #120d09 0%, #3b2819 48%, #76502d 100%)",
     color: "#fff8dd",
-    boxShadow: "inset 0 10px 18px rgba(0,0,0,0.34), 0 6px 12px rgba(35, 18, 5, 0.28)",
+    boxShadow: "inset 0 14px 24px rgba(0,0,0,0.72), 0 8px 14px rgba(0,0,0,0.42)",
     fontWeight: 900,
     cursor: "pointer",
     display: "grid",
@@ -358,13 +385,15 @@ const styles = {
     width: 14,
     height: 19,
     borderRadius: "55% 45% 52% 48%",
-    background: "radial-gradient(circle at 34% 28%, #fff0b8 0 13%, #d99a42 34%, #8a4e1d 72%, #4a2410 100%)",
+    background: "radial-gradient(circle at 34% 28%, #f8d890 0 13%, #b86b28 34%, #5a2d16 72%, #180b06 100%)",
     boxShadow: "inset -2px -3px 4px rgba(59, 27, 8, 0.45), inset 2px 2px 3px rgba(255,255,255,0.38), 0 2px 3px rgba(31, 13, 4, 0.42)",
     transformOrigin: "center"
   },
   awaleScoreBar: {
     borderRadius: 14,
-    background: "rgba(255,255,255,0.88)",
+    background: theme.panel,
+    border: `1px solid ${theme.line}`,
+    color: "#f4e7c8",
     padding: 10,
     display: "flex",
     flexWrap: "wrap",
@@ -373,23 +402,25 @@ const styles = {
     fontWeight: 800
   },
   ruleBox: {
-    borderRadius: 14,
-    background: "rgba(255,255,255,0.9)",
+    borderRadius: 4,
+    background: theme.panel,
+    border: `1px solid ${theme.line}`,
+    color: "#e7d5ad",
     padding: 12,
     display: "grid",
     gap: 6,
     fontSize: 13
   },
   twentyOneTargetPanel: {
-    borderRadius: 18,
-    background: "linear-gradient(135deg, #fff5bc, #ffc857)",
-    color: "#17204a",
+    borderRadius: 4,
+    background: "linear-gradient(135deg, rgba(62, 45, 27, 0.96), rgba(12, 10, 8, 0.96))",
+    color: "#f4e7c8",
     padding: "12px 16px",
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
     gap: 10,
-    boxShadow: "0 12px 24px rgba(8, 12, 28, 0.24)",
-    border: "3px solid rgba(255,255,255,0.88)"
+    boxShadow: "inset 0 0 28px rgba(0,0,0,0.62), 0 12px 24px rgba(0,0,0,0.46)",
+    border: `1px solid rgba(240, 138, 53, 0.5)`
   },
   twentyOneTargetMetric: {
     display: "grid",
@@ -406,8 +437,9 @@ const styles = {
     maxHeight: 180,
     overflow: "auto",
     borderRadius: 12,
-    background: "rgba(8, 18, 28, 0.8)",
-    color: "#fff",
+    background: "rgba(4, 4, 3, 0.82)",
+    border: `1px solid ${theme.line}`,
+    color: "#e7d5ad",
     padding: 10,
     fontSize: 13
   },
@@ -418,7 +450,7 @@ const styles = {
   modalBackdrop: {
     position: "fixed",
     inset: 0,
-    background: "rgba(2, 6, 22, 0.72)",
+    background: "rgba(2, 2, 2, 0.82)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -427,12 +459,12 @@ const styles = {
   },
   modal: {
     width: "min(100%, 820px)",
-    borderRadius: 16,
-    background: "linear-gradient(135deg, #2b3f89, #4b2b86)",
+    borderRadius: 4,
+    background: "linear-gradient(160deg, rgba(48, 35, 23, 0.98), rgba(8, 7, 6, 0.98))",
     padding: 16,
-    boxShadow: "0 18px 36px rgba(5, 8, 20, 0.46)",
-    border: "3px solid #fff",
-    color: "#fff"
+    boxShadow: `inset 0 0 44px rgba(0,0,0,0.72), 0 18px 42px rgba(0,0,0,0.7), 0 0 36px ${theme.glow}`,
+    border: `1px solid rgba(240, 138, 53, 0.56)`,
+    color: "#f4e7c8"
   },
   modalCards: {
     marginTop: 10,
@@ -447,10 +479,10 @@ const styles = {
     bottom: 16,
     transform: "translateX(-50%)",
     zIndex: 40,
-    borderRadius: 12,
-    border: "2px solid #fff",
-    background: "linear-gradient(135deg, #2c8dff, #4c3aff)",
-    color: "#fff",
+    borderRadius: 3,
+    border: `1px solid rgba(240, 138, 53, 0.62)`,
+    background: `linear-gradient(135deg, ${theme.blood}, #1c0504)`,
+    color: "#f4e7c8",
     fontWeight: 800,
     fontSize: 13,
     padding: "8px 12px",
@@ -532,6 +564,24 @@ function attackCardTheme(attackType) {
   if (attackType === "ranged") return { bg: "linear-gradient(135deg, #ff6f4d, #ff3c6f)", icon: "➶", title: "Distance", die: "D4" };
   if (attackType === "magic") return { bg: "linear-gradient(135deg, #2da9ff, #5a46ff)", icon: "✦", title: "Magie", die: "D6" };
   return { bg: "linear-gradient(135deg, #ffd447, #ff8e32)", icon: "⚔", title: "Mêlée", die: "D8" };
+}
+
+function soulsCardPalette(card) {
+  if (card.type === "trump") return { bg: "radial-gradient(circle at 50% 20%, rgba(240, 138, 53, 0.38), transparent 36%), linear-gradient(160deg, #3a2414, #080706 78%)", icon: "♛" };
+  if (card.type === "utility") return { bg: "radial-gradient(circle at 50% 22%, rgba(167, 139, 89, 0.28), transparent 38%), linear-gradient(160deg, #2e261c, #0a0907 78%)", icon: "✦" };
+
+  if (card.defense === "dodge") return { bg: "linear-gradient(160deg, #5b2b19, #110b08 78%)", icon: "↺" };
+  if (card.defense === "block") return { bg: "linear-gradient(160deg, #3a392f, #0a0907 78%)", icon: "♜" };
+  if (card.defense === "counter_melee") return { bg: "linear-gradient(160deg, #6c411f, #120a05 78%)", icon: "⚔" };
+  if (card.defense === "counter_magic") return { bg: "linear-gradient(160deg, #2e3140, #08080b 78%)", icon: "✦" };
+
+  return { bg: "linear-gradient(160deg, #332c23, #090806 78%)", icon: "?" };
+}
+
+function soulsAttackCardTheme(attackType) {
+  if (attackType === "ranged") return { bg: "linear-gradient(160deg, #553322, #110907 78%)", icon: "➶", title: "Distance", die: "D4" };
+  if (attackType === "magic") return { bg: "linear-gradient(160deg, #2b2d3a, #08080b 78%)", icon: "✦", title: "Magie", die: "D6" };
+  return { bg: "linear-gradient(160deg, #6b3f1b, #100805 78%)", icon: "⚔", title: "MÃªlÃ©e", die: "D8" };
 }
 
 function previewCardFromVision(rawCard) {
@@ -873,9 +923,38 @@ function App() {
     <main style={{ ...styles.page, padding: isMobilePortrait ? 0 : isMobile ? 6 : isMobileLandscape ? 4 : styles.page.padding }}>
       <style>{`
         html, body, #root { margin: 0; min-height: 100%; width: 100%; }
-        body { overflow-x: hidden; }
+        body { overflow-x: hidden; background: #030302; }
         * { box-sizing: border-box; }
         button, input { font: inherit; max-width: 100%; }
+        button {
+          border-radius: 3px;
+          border: 1px solid rgba(216, 201, 167, 0.42);
+          background: linear-gradient(180deg, rgba(54, 40, 25, 0.98), rgba(13, 11, 9, 0.98));
+          color: #f4e7c8;
+          padding: 8px 12px;
+          cursor: pointer;
+          box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.58), 0 8px 14px rgba(0, 0, 0, 0.32);
+          text-transform: uppercase;
+          letter-spacing: 0;
+        }
+        button:hover:not(:disabled) {
+          border-color: rgba(240, 138, 53, 0.72);
+          filter: brightness(1.08);
+        }
+        button:disabled {
+          cursor: not-allowed;
+          filter: grayscale(0.7);
+        }
+        input {
+          border-radius: 3px;
+          border: 1px solid rgba(216, 201, 167, 0.42);
+          background: rgba(5, 4, 3, 0.84);
+          color: #f4e7c8;
+          padding: 9px 11px;
+          box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.62);
+        }
+        input::placeholder { color: rgba(216, 201, 167, 0.62); }
+        strong { color: #f2dfb8; }
         @media (max-width: 700px) and (orientation: portrait) {
           button { min-height: 40px; }
           input { min-height: 40px; width: 100%; }
@@ -938,8 +1017,8 @@ function App() {
                   onClick={() => setGameType(choice.id)}
                   style={{
                     ...styles.gameChoiceButton,
-                    border: gameType === choice.id ? "2px solid #4f46e5" : styles.gameChoiceButton.border,
-                    boxShadow: gameType === choice.id ? "0 0 0 3px rgba(79, 70, 229, 0.18)" : "none"
+                    border: gameType === choice.id ? "1px solid rgba(240, 138, 53, 0.86)" : styles.gameChoiceButton.border,
+                    boxShadow: gameType === choice.id ? `0 0 0 2px rgba(240, 138, 53, 0.18), inset 0 0 28px ${theme.glow}` : "none"
                   }}
                 >
                   <strong>{choice.title}</strong>
@@ -1129,7 +1208,7 @@ function App() {
               </div>
             </div>
 
-            <div style={{ ...styles.board, minHeight: "auto", gridTemplateRows: "auto auto auto", background: "radial-gradient(circle at center, #242b62 0%, #17204a 55%, #11162f 100%)" }}>
+            <div style={{ ...styles.board, minHeight: "auto", gridTemplateRows: "auto auto auto", background: "radial-gradient(circle at center, rgba(112, 71, 34, 0.42) 0%, rgba(22, 17, 12, 0.98) 55%, rgba(4, 4, 3, 0.98) 100%)" }}>
               {[opponents[0], me].filter(Boolean).map((player) => {
                 const isSelf = player.id === me?.id;
                 const total = player.twentyOne?.total ?? 0;
@@ -1142,7 +1221,7 @@ function App() {
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
                       {(player.twentyOne?.cards ?? []).map((card, index) => (
-                        <div key={`${player.id}-num-${card.id}-${index}`} style={{ ...styles.cardBack, width: 58, height: 78, background: card.hidden && !isSelf ? "linear-gradient(140deg, #141a38, #394080)" : "linear-gradient(140deg, #fff3b0, #ffbf4d)", color: "#17204a", flexDirection: "column" }}>
+                        <div key={`${player.id}-num-${card.id}-${index}`} style={{ ...styles.cardBack, width: 58, height: 78, background: card.hidden && !isSelf ? "linear-gradient(140deg, #11100d, #382817)" : "linear-gradient(140deg, #d8c08a, #6f3c19)", color: card.hidden && !isSelf ? "#d8c9a7" : "#160d07", flexDirection: "column" }}>
                           <span style={{ fontSize: 11 }}>{card.hidden && !isSelf ? "Hush" : "NUM"}</span>
                           <strong style={{ fontSize: 26 }}>{card.value ?? "?"}</strong>
                         </div>
@@ -1172,7 +1251,7 @@ function App() {
                   <div style={{ ...styles.playerBadge, flexWrap: "wrap" }}>{me.name} · Trumps en main: {me.hand.length}</div>
                   <div style={{ ...styles.handRow, minHeight: 150 }}>
                     {me.hand.map((card, index) => {
-                      const palette = cardPalette(card);
+                      const palette = soulsCardPalette(card);
                       const isActive = activeCardId === card.id;
                       const tilt = (index - (me.hand.length - 1) / 2) * 4;
                       return (
@@ -1234,7 +1313,7 @@ function App() {
                     {Array.from({ length: opponents[0].handCount }).map((_, index) => (
                       (() => {
                         const revealedCard = previewCardFromVision(state.opponentHandPreview?.[index]);
-                        const palette = revealedCard ? cardPalette(revealedCard) : null;
+                        const palette = revealedCard ? soulsCardPalette(revealedCard) : null;
                         return (
                           <div
                             key={`opponent-card-${index}`}
@@ -1330,7 +1409,7 @@ function App() {
                 </div>
                 <div style={{ ...styles.handRow, minHeight: isMobilePortrait ? 132 : isMobile ? 124 : styles.handRow.minHeight, gap: isMobilePortrait ? 5 : isMobile ? 6 : styles.handRow.gap, padding: isMobilePortrait ? "8px 0" : styles.handRow.padding }}>
                   {me.hand.map((card, index) => {
-                    const palette = cardPalette(card);
+                    const palette = soulsCardPalette(card);
                     const isActive = activeCardId === card.id;
                     const tilt = (index - (me.hand.length - 1) / 2) * 5;
                     return (
@@ -1388,7 +1467,7 @@ function App() {
               <strong>Actions de tour</strong>
               <div style={{ ...styles.actionCards, gridTemplateColumns: isMobilePortrait ? "repeat(3, minmax(0, 1fr))" : isMobile ? "repeat(2, minmax(0, 1fr))" : styles.actionCards.gridTemplateColumns, gap: isMobilePortrait ? 6 : styles.actionCards.gap }}>
                 {["ranged", "magic", "melee"].map((attackType) => {
-                  const theme = attackCardTheme(attackType);
+                  const theme = soulsAttackCardTheme(attackType);
                   return (
                     <button
                       key={attackType}
@@ -1434,7 +1513,7 @@ function App() {
 
               <div style={styles.modalCards}>
                 {validDefenseCards.map((card) => {
-                  const palette = cardPalette(card);
+                  const palette = soulsCardPalette(card);
                   return (
                     <button
                       key={card.id}
@@ -1503,7 +1582,7 @@ function App() {
           </div>
         )}
 
-        {error && <p style={{ color: "#8b0000", fontWeight: 700 }}>{error}</p>}
+        {error && <p style={{ color: "#d3533a", fontWeight: 700, textTransform: "uppercase", textShadow: "0 0 14px rgba(211,83,58,0.58)" }}>{error}</p>}
       </div>
     </main>
   );
