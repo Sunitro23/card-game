@@ -23,6 +23,12 @@ const theme = {
   glow: "rgba(240, 138, 53, 0.34)"
 };
 
+const GAME_CHOICES = [
+  { id: "card_duel", title: "Duel de cartes", desc: "Combat strict au tour par tour, attaques et defenses." },
+  { id: "awale", title: "Awale classique", desc: "Plateau rituel, douze trous, captures par deux ou trois." },
+  { id: "twenty_one", title: "Twenty One", desc: "Rapproche-toi de la cible, joue tes Trumps, preserve tes vies." }
+];
+
 const styles = {
   page: {
     width: "100%",
@@ -37,17 +43,125 @@ const styles = {
   },
   panel: {
     margin: "0 auto",
-    maxWidth: 1060,
+    maxWidth: 980,
     width: "100%"
   },
   homeCard: {
-    background: "linear-gradient(180deg, rgba(31, 27, 20, 0.96), rgba(12, 10, 8, 0.96))",
-    border: `1px solid ${theme.line}`,
-    borderRadius: 4,
-    padding: 16,
-    boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.65), 0 18px 44px rgba(0,0,0,0.58), 0 0 30px ${theme.glow}`,
+    position: "relative",
+    overflow: "hidden",
+    background: "radial-gradient(circle at 50% 0%, rgba(120, 75, 36, 0.24), transparent 34%), linear-gradient(180deg, rgba(31, 25, 17, 0.97), rgba(8, 7, 6, 0.98)), repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 5px)",
+    border: "1px solid rgba(213, 190, 137, 0.44)",
+    borderRadius: 2,
+    padding: 24,
+    boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.78), inset 0 0 72px rgba(0,0,0,0.82), 0 24px 52px rgba(0,0,0,0.68)",
     display: "grid",
-    gap: 10
+    gap: 18
+  },
+  menuHeader: {
+    display: "grid",
+    gap: 6,
+    paddingBottom: 13,
+    borderBottom: "1px solid rgba(213, 190, 137, 0.26)"
+  },
+  menuTitle: {
+    margin: 0,
+    color: "#f1e2bf",
+    fontSize: "clamp(30px, 4.4vw, 52px)",
+    lineHeight: 1,
+    fontWeight: 500,
+    letterSpacing: 0,
+    textShadow: "0 3px 8px rgba(0,0,0,0.9)"
+  },
+  menuSubtitle: {
+    maxWidth: 640,
+    color: "rgba(232, 216, 181, 0.72)",
+    fontSize: 14,
+    lineHeight: 1.45
+  },
+  menuSection: {
+    display: "grid",
+    gap: 0,
+    borderTop: "1px solid rgba(213, 190, 137, 0.18)"
+  },
+  menuSectionTitle: {
+    color: "rgba(185, 156, 103, 0.82)",
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    padding: "12px 0 7px",
+    letterSpacing: 0
+  },
+  menuRow: {
+    width: "100%",
+    minHeight: 38,
+    display: "grid",
+    gridTemplateColumns: "minmax(130px, 1fr) minmax(110px, auto)",
+    alignItems: "center",
+    gap: 16,
+    padding: "7px 10px",
+    border: 0,
+    borderTop: "1px solid rgba(213, 190, 137, 0.13)",
+    borderRadius: 0,
+    background: "transparent",
+    color: "rgba(239, 225, 194, 0.82)",
+    boxShadow: "none",
+    textAlign: "left",
+    textTransform: "none"
+  },
+  menuButtonRow: {
+    cursor: "pointer"
+  },
+  menuRowSelected: {
+    background: "linear-gradient(90deg, rgba(126, 63, 24, 0.86), rgba(75, 36, 14, 0.46) 62%, transparent)",
+    color: "#fff0c9",
+    boxShadow: "inset 3px 0 0 rgba(238, 149, 56, 0.92), inset 0 0 22px rgba(109, 42, 15, 0.48)"
+  },
+  menuLabel: {
+    minWidth: 0,
+    fontSize: 16
+  },
+  menuValue: {
+    justifySelf: "end",
+    minWidth: 0,
+    color: "#f1dfb5",
+    fontSize: 15,
+    textAlign: "right"
+  },
+  menuInput: {
+    justifySelf: "end",
+    width: "min(240px, 42vw)",
+    minHeight: 30,
+    padding: "2px 0",
+    border: 0,
+    borderBottom: "1px solid rgba(213, 190, 137, 0.48)",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
+    color: "#f4e7c8",
+    textAlign: "right",
+    outline: "none"
+  },
+  menuDescription: {
+    marginTop: -8,
+    padding: "0 10px 4px",
+    color: "rgba(224, 206, 166, 0.68)",
+    fontSize: 13,
+    lineHeight: 1.4
+  },
+  menuActions: {
+    display: "grid",
+    gap: 0,
+    paddingTop: 2,
+    borderTop: "1px solid rgba(213, 190, 137, 0.22)"
+  },
+  menuActionHint: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingTop: 10,
+    color: "rgba(232, 216, 181, 0.58)",
+    fontSize: 12
   },
   lobbyPlayers: {
     margin: 0,
@@ -786,6 +900,7 @@ function App() {
   const isAwaleGame = state?.gameType === "awale";
   const isTwentyOneGame = state?.gameType === "twenty_one";
   const isHost = Boolean(state && me && state.hostPlayerId === me.id);
+  const selectedMode = GAME_CHOICES.find((choice) => choice.id === gameType) ?? GAME_CHOICES[0];
   const defenseCards = React.useMemo(
     () => me?.hand?.filter((c) => c.type === "defense") ?? [],
     [me]
@@ -934,7 +1049,6 @@ function App() {
           padding: 8px 12px;
           cursor: pointer;
           box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.58), 0 8px 14px rgba(0, 0, 0, 0.32);
-          text-transform: uppercase;
           letter-spacing: 0;
         }
         button:hover:not(:disabled) {
@@ -955,9 +1069,54 @@ function App() {
         }
         input::placeholder { color: rgba(216, 201, 167, 0.62); }
         strong { color: #f2dfb8; }
+        .souls-frame::before,
+        .souls-frame::after {
+          content: "";
+          position: absolute;
+          width: 44px;
+          height: 44px;
+          border-color: rgba(222, 196, 132, 0.5);
+          pointer-events: none;
+        }
+        .souls-frame::before {
+          left: 9px;
+          top: 9px;
+          border-left: 1px solid;
+          border-top: 1px solid;
+          box-shadow: -5px -5px 0 -4px rgba(222, 196, 132, 0.5);
+        }
+        .souls-frame::after {
+          right: 9px;
+          bottom: 9px;
+          border-right: 1px solid;
+          border-bottom: 1px solid;
+          box-shadow: 5px 5px 0 -4px rgba(222, 196, 132, 0.5);
+        }
+        .menu-row:hover:not(:disabled),
+        .menu-row:focus-visible,
+        .menu-field:focus-within {
+          background: linear-gradient(90deg, rgba(116, 56, 20, 0.72), rgba(64, 30, 13, 0.36) 62%, transparent);
+          color: #fff0c9;
+          outline: none;
+          filter: none;
+        }
+        .menu-row:disabled {
+          color: rgba(216, 201, 167, 0.35);
+          cursor: not-allowed;
+        }
+        .menu-action {
+          grid-template-columns: minmax(130px, 1fr) minmax(110px, auto);
+        }
+        .menu-input:focus {
+          border-bottom-color: rgba(240, 138, 53, 0.9);
+        }
         @media (max-width: 700px) and (orientation: portrait) {
           button { min-height: 40px; }
           input { min-height: 40px; width: 100%; }
+          .menu-row {
+            grid-template-columns: 1fr;
+            gap: 4px;
+          }
         }
         @keyframes defense-pop {
           0% { transform: scale(0.92) translateY(12px); opacity: 0; }
@@ -1001,7 +1160,82 @@ function App() {
         }}
       >
         {!state && (
-          <section style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 12 : styles.homeCard.padding }}>
+          <section className="souls-frame" style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 16 : styles.homeCard.padding }}>
+            <header style={styles.menuHeader}>
+              <h1 style={styles.menuTitle}>Salle de jeux</h1>
+              <span style={styles.menuSubtitle}>
+                Cree une room ou rejoins une room existante. Mode choisi: {selectedMode.title}.
+              </span>
+            </header>
+
+            <section style={styles.menuSection}>
+              <div style={styles.menuSectionTitle}>Joueur</div>
+              <label className="menu-field" style={styles.menuRow}>
+                <span style={styles.menuLabel}>Nom du joueur</span>
+                <input
+                  className="menu-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Joueur"
+                  style={styles.menuInput}
+                />
+              </label>
+            </section>
+
+            <section style={styles.menuSection}>
+              <div style={styles.menuSectionTitle}>Mode de jeu</div>
+              {GAME_CHOICES.map((choice) => {
+                const isSelected = gameType === choice.id;
+                return (
+                  <button
+                    key={choice.id}
+                    className="menu-row"
+                    type="button"
+                    onClick={() => setGameType(choice.id)}
+                    style={{
+                      ...styles.menuRow,
+                      ...styles.menuButtonRow,
+                      ...(isSelected ? styles.menuRowSelected : null)
+                    }}
+                  >
+                    <span style={styles.menuLabel}>{choice.title}</span>
+                    <span style={styles.menuValue}>{isSelected ? "Selectionne" : ""}</span>
+                  </button>
+                );
+              })}
+              <span style={styles.menuDescription}>{selectedMode.desc}</span>
+            </section>
+
+            <section style={styles.menuSection}>
+              <div style={styles.menuSectionTitle}>Connexion / room</div>
+              <label className="menu-field" style={styles.menuRow}>
+                <span style={styles.menuLabel}>Code room</span>
+                <input
+                  className="menu-input"
+                  value={code}
+                  placeholder="____"
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  style={styles.menuInput}
+                />
+              </label>
+            </section>
+
+            <section style={styles.menuActions}>
+              <div style={styles.menuSectionTitle}>Actions</div>
+              <button className="menu-row menu-action" type="button" onClick={handleCreateRoom} style={{ ...styles.menuRow, ...styles.menuButtonRow }}>
+                <span style={styles.menuLabel}>Creer une room</span>
+                <span style={styles.menuValue}>{selectedMode.title}</span>
+              </button>
+              <button className="menu-row menu-action" type="button" onClick={handleJoinRoom} style={{ ...styles.menuRow, ...styles.menuButtonRow }}>
+                <span style={styles.menuLabel}>Rejoindre</span>
+                <span style={styles.menuValue}>{code || "Code requis"}</span>
+              </button>
+              <div style={styles.menuActionHint}>
+                <span>Entrer: valider la ligne active</span>
+                <span>Selection: orange-brun</span>
+              </div>
+            </section>
+            <div style={{ display: "none" }}>
             <strong style={{ fontSize: 20 }}>Salle de jeux</strong>
             <span>Crée une room ou rejoins une room existante, puis joue au duel de cartes ou à l'Awalé.</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
@@ -1036,11 +1270,63 @@ function App() {
               />
               <button style={{ flex: isMobilePortrait ? "1 1 38%" : undefined }} onClick={handleJoinRoom}>Rejoindre</button>
             </div>
+            </div>
           </section>
         )}
 
         {state && isLobbyPhase && (
-          <section style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 12 : styles.homeCard.padding }}>
+          <section className="souls-frame" style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 16 : styles.homeCard.padding }}>
+            <header style={styles.menuHeader}>
+              <h1 style={styles.menuTitle}>Lobby</h1>
+              <span style={styles.menuSubtitle}>
+                Room {state.code}. {state.gameType === "awale" ? "Awale classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"}. En attente des joueurs.
+              </span>
+            </header>
+
+            <section style={styles.menuSection}>
+              <div style={styles.menuSectionTitle}>Joueurs</div>
+              {state.players.map((player) => (
+                <div
+                  key={player.id}
+                  className="menu-row"
+                  style={{
+                    ...styles.menuRow,
+                    ...(player.id === state.hostPlayerId ? styles.menuRowSelected : null)
+                  }}
+                >
+                  <span style={styles.menuLabel}>{player.name}</span>
+                  <span style={styles.menuValue}>{player.id === state.hostPlayerId ? "Hote" : "Invite"}</span>
+                </div>
+              ))}
+              {state.players.length < 2 && (
+                <div className="menu-row" style={{ ...styles.menuRow, color: "rgba(216, 201, 167, 0.48)" }}>
+                  <span style={styles.menuLabel}>Emplacement libre</span>
+                  <span style={styles.menuValue}>En attente</span>
+                </div>
+              )}
+            </section>
+
+            <section style={styles.menuActions}>
+              <div style={styles.menuSectionTitle}>Actions</div>
+              {isHost ? (
+                <button
+                  className="menu-row menu-action"
+                  type="button"
+                  onClick={handleStartGame}
+                  disabled={state.players.length < 2}
+                  style={{ ...styles.menuRow, ...styles.menuButtonRow }}
+                >
+                  <span style={styles.menuLabel}>Demarrer</span>
+                  <span style={styles.menuValue}>{state.players.length < 2 ? "Deux joueurs requis" : "Pret"}</span>
+                </button>
+              ) : (
+                <div className="menu-row" style={{ ...styles.menuRow, color: "rgba(216, 201, 167, 0.58)" }}>
+                  <span style={styles.menuLabel}>Demarrer</span>
+                  <span style={styles.menuValue}>Reserve a l'hote</span>
+                </div>
+              )}
+            </section>
+            <div style={{ display: "none" }}>
             <strong style={{ fontSize: 20 }}>Lobby</strong>
             <p style={{ margin: 0 }}>
               Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"} · En attente des joueurs.
@@ -1061,6 +1347,7 @@ function App() {
                 <span>Seul l'hôte peut lancer la partie.</span>
               )}
               {state.players.length < 2 && <span>Il faut 2 joueurs pour démarrer.</span>}
+            </div>
             </div>
           </section>
         )}
