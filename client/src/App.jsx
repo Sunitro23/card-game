@@ -65,11 +65,16 @@ export function App() {
     if (!state) return null;
     return state.players.find((p) => p.hand);
   }, [state]);
+  const isSpectator = state?.viewerRole === "spectator" || Boolean(state && !me);
 
   const opponents = React.useMemo(() => {
     if (!state || !me) return [];
     return state.players.filter((p) => p.id !== me.id);
   }, [state, me]);
+  const visibleDuelPlayers = React.useMemo(() => {
+    if (!state) return [];
+    return me ? [opponents[0], me].filter(Boolean) : state.players;
+  }, [state, me, opponents]);
   const selectedTwentyOneTrump = React.useMemo(() => {
     const active = me?.hand?.find((card) => card.id === activeCardId && card.type === "trump");
     return active ?? me?.hand?.find((card) => card.type === "trump") ?? null;
@@ -103,6 +108,18 @@ export function App() {
   }, [defenseCards, pendingAttack]);
 
   const awaleRows = React.useMemo(() => getAwaleRowsForViewer(state, me), [state, me]);
+  const gameWinner = React.useMemo(() => {
+    if (!state || state.phase !== "finished") return null;
+    if (state.gameType === "twenty_one" && state.twentyOne?.winnerId) {
+      return state.players.find((player) => player.id === state.twentyOne.winnerId) ?? null;
+    }
+    if (state.gameType === "awale" && state.awale?.winnerSide !== undefined) {
+      if (state.awale.winnerSide === null) return null;
+      return state.players.find((player) => player.awaleSide === state.awale.winnerSide) ?? null;
+    }
+    const lastFinish = [...(state.log ?? [])].reverse().find((entry) => entry.type === "game_finished");
+    return state.players.find((player) => lastFinish?.message?.includes(`${player.name} remporte`)) ?? null;
+  }, [state]);
 
   React.useEffect(() => {
     if (!me) {
@@ -175,6 +192,15 @@ export function App() {
     });
   }
 
+  function handleSpectateRoom() {
+    ensureConnection();
+    setError("");
+    socket.emit("room:spectate", {
+      code: code.trim().toUpperCase(),
+      spectatorName: name.trim() || "Spectateur"
+    });
+  }
+
   function handleStartGame() {
     if (!state) return;
     socket.emit("game:start", { code: state.code });
@@ -237,6 +263,17 @@ export function App() {
 
   function abortCurrentGame() {
     socket.emit("game:abort");
+  }
+
+  function replayCurrentGame() {
+    socket.emit("game:replay");
+  }
+
+  function returnToMenu() {
+    socket.disconnect();
+    setState(null);
+    setError("");
+    setActiveCardId(null);
   }
 
   function handleCardClick(card) {
@@ -528,6 +565,19 @@ export function App() {
                 <span style={styles.menuLabel}>Rejoindre</span>
                 <span style={styles.menuValue}>{roomAction === "join" ? "Sélectionné" : ""}</span>
               </button>
+              <button
+                className="menu-row menu-action"
+                type="button"
+                onClick={() => setRoomAction("spectate")}
+                style={{
+                  ...styles.menuRow,
+                  ...styles.menuButtonRow,
+                  ...(roomAction === "spectate" ? styles.menuRowSelected : null)
+                }}
+              >
+                <span style={styles.menuLabel}>Regarder</span>
+                <span style={styles.menuValue}>{roomAction === "spectate" ? "Sélectionné" : ""}</span>
+              </button>
             </section>
 
             {roomAction === "create" ? (
@@ -576,7 +626,7 @@ export function App() {
             <button
               className="menu-row menu-action"
               type="button"
-              onClick={roomAction === "create" ? handleCreateRoom : handleJoinRoom}
+              onClick={roomAction === "create" ? handleCreateRoom : roomAction === "spectate" ? handleSpectateRoom : handleJoinRoom}
               style={{ ...styles.menuRow, ...styles.menuButtonRow, ...styles.validateButton }}
             >
               Valider
@@ -793,7 +843,7 @@ export function App() {
                 >
                   {showAwaleRules ? "Masquer" : "Règles"}
                 </button>
-                <button onClick={abortCurrentGame} disabled={state.phase === "finished"}>Abandonner</button>
+                <button onClick={abortCurrentGame} disabled={state.phase === "finished" || isSpectator}>Abandonner</button>
               </div>
             </div>
 
@@ -827,7 +877,7 @@ export function App() {
                 padding: isMobilePortrait ? "7px 8px" : styles.awaleTurnHint.padding
               }}
             >
-              {isMyTurn && state.phase !== "finished" ? "À toi de jouer : choisis un trou de ton camp." : state.phase === "finished" ? "Partie terminée." : "Tour adverse."}
+              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "À toi de jouer : choisis un trou de ton camp." : state.phase === "finished" ? "Partie terminée." : "Tour adverse."}
             </div>
 
             <div
@@ -932,7 +982,7 @@ export function App() {
                 </button>
                 <button
                   onClick={abortCurrentGame}
-                  disabled={state.phase === "finished"}
+                  disabled={state.phase === "finished" || isSpectator}
                   style={{
                     minHeight: isMobile ? 30 : undefined,
                     padding: isMobile ? "4px 8px" : undefined,
@@ -947,10 +997,23 @@ export function App() {
               <section style={{ ...styles.ruleBox, borderColor: "rgba(216, 201, 167, 0.16)", background: "rgba(10, 9, 7, 0.7)", fontSize: isMobile ? 12 : styles.ruleBox.fontSize, padding: isMobile ? 8 : styles.ruleBox.padding }}>
                 <strong>Règles Twenty One</strong>
                 <span>Chaque manche vise la cible active. Les Go For peuvent la changer en 17, 24 ou 27.</span>
+                <span>L'As vaut 1 ou 11 selon le meilleur total possible.</span>
+                <span>Chaque joueur commence avec 2 cartes cachees. Le paquet numerique contient une seule carte de chaque rang.</span>
+                <span>Le joueur actif peut piocher autant qu'il veut, puis cliquer Rester pour passer la main.</span>
                 <span>Le perdant perd la mise en vies; Bless peut empêcher une mort.</span>
                 <span>Les cartes spéciales gardées restent en main. +3 cartes spéciales par manche, jusqu'à 6 en main.</span>
               </section>
             )}
+
+            <div
+              style={{
+                ...styles.awaleTurnHint,
+                fontSize: isMobile ? 13 : 15,
+                padding: isMobile ? "7px 8px" : styles.awaleTurnHint.padding
+              }}
+            >
+              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "A toi de jouer : pioche autant que tu veux, puis clique Rester." : state.phase === "finished" ? "Partie terminee." : "Tour adverse."}
+            </div>
 
             <div
               style={{
@@ -960,12 +1023,12 @@ export function App() {
               }}
             >
               <div style={{ ...styles.twentyOneTable, padding: isMobile ? 8 : styles.twentyOneTable.padding, gap: isMobile ? 8 : styles.twentyOneTable.gap }}>
-                {[me, opponents[0]].filter(Boolean).map((player) => {
+                {(me ? [me, opponents[0]].filter(Boolean) : state.players).map((player) => {
                   const isSelf = player.id === me?.id;
                   const total = player.twentyOne?.total ?? 0;
                   const target = state.twentyOne?.target ?? 21;
                   const busted = total > target;
-                  const playerStatus = busted ? "Bust" : player.twentyOne?.stood ? "Reste" : "";
+                  const playerStatus = player.twentyOne?.stood ? "Reste" : player.id === state.turnPlayerId && state.phase !== "finished" ? "Tour actif" : busted ? "Bust" : "";
                   const playerNote = [playerStatus, player.twentyOne?.bless ? "Bless" : ""].filter(Boolean).join(" · ");
                   return (
                     <div key={player.id} style={{ ...styles.twentyOnePlayerPanel, borderTop: isSelf ? 0 : styles.twentyOnePlayerPanel.borderTop, padding: isMobile ? "4px 0" : styles.twentyOnePlayerPanel.padding }}>
@@ -1008,7 +1071,7 @@ export function App() {
                             }}
                           >
                             <span style={{ fontSize: isMobile ? 10 : 11 }}>{card.hidden && !isSelf ? "CACHÉE" : "CARTE"}</span>
-                            <strong style={{ fontSize: isMobile ? 28 : 26 }}>{card.value ?? "?"}</strong>
+                            <strong style={{ fontSize: isMobile ? 28 : 26 }}>{card.rank ?? card.value ?? "?"}</strong>
                           </div>
                         ))}
                         {!(player.twentyOne?.cards?.length) && (
@@ -1035,13 +1098,13 @@ export function App() {
                     <button
                       className="twenty-one-action"
                       onClick={drawTwentyOneNumber}
-                      disabled={me?.twentyOne?.stood || me?.twentyOne?.autoBust || state.phase === "finished"}
+                      disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
                       style={{
                         ...styles.twentyOneDrawAction,
                         minHeight: isMobile ? 54 : styles.twentyOneDrawAction.minHeight,
                         gridTemplateColumns: isMobile ? "28px 1fr" : styles.twentyOneDrawAction.gridTemplateColumns,
                         padding: isMobile ? "6px 8px" : undefined,
-                        opacity: me?.twentyOne?.stood || me?.twentyOne?.autoBust || state.phase === "finished" ? 0.6 : 1
+                        opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1
                       }}
                     >
                       <span style={{ fontSize: isMobile ? 21 : 28, lineHeight: 1 }}>🂡</span>
@@ -1053,13 +1116,13 @@ export function App() {
                     <button
                       className="twenty-one-action"
                       onClick={standTwentyOne}
-                      disabled={me?.twentyOne?.stood || state.phase === "finished"}
+                      disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
                       style={{
                         ...styles.twentyOneStandAction,
                         minHeight: isMobile ? 54 : styles.twentyOneStandAction.minHeight,
                         padding: isMobile ? "6px 8px" : undefined,
                         fontSize: isMobile ? 14 : undefined,
-                        opacity: me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1
+                        opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1
                       }}
                     >
                       Rester
@@ -1086,6 +1149,7 @@ export function App() {
                           key={card.id}
                           className="twenty-one-trump-card"
                           type="button"
+                          disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
                           onClick={() => handleCardClick(card)}
                           onMouseEnter={(event) => setHoveredTrump({ card, x: event.clientX, y: event.clientY })}
                           onMouseMove={(event) => setHoveredTrump({ card, x: event.clientX, y: event.clientY })}
@@ -1099,7 +1163,7 @@ export function App() {
                             padding: isMobile ? 5 : styles.twentyOneTrumpCard.padding,
                             background: palette.bg,
                             border: isActive ? "1px solid rgba(240, 138, 53, 0.86)" : "1px solid rgba(229, 208, 156, 0.34)",
-                            opacity: isVoluntaryStand && !isActive ? 0.68 : 1
+                            opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : isVoluntaryStand && !isActive ? 0.68 : 1
                           }}
                           aria-label={`${cardLabel(card)}. ${trumpDescription}`}
                         >
@@ -1130,7 +1194,22 @@ export function App() {
             }}
           >
             <div>
-              {opponents[0] ? (
+              {isSpectator ? (
+                <div style={{ display: "grid", gap: 12 }}>
+                  {visibleDuelPlayers.map((player) => (
+                    <div key={player.id}>
+                      <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
+                        {player.name} · HP {player.hp} · Énergie {player.energy}/{state.config.maxEnergy} · {player.handCount} cartes
+                      </div>
+                      <div style={styles.opponentHand}>
+                        {Array.from({ length: player.handCount }).map((_, index) => (
+                          <div key={`${player.id}-spectator-card-${index}`} style={styles.cardBack}>UNO</div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : opponents[0] ? (
                 <>
                   <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
                     {opponents[0].name} · HP {opponents[0].hp} · Énergie {opponents[0].energy}/{state.config.maxEnergy} · {opponents[0].handCount} cartes
@@ -1327,6 +1406,38 @@ export function App() {
               ))}
             </ul>
           </section>
+        )}
+
+        {state?.phase === "finished" && (
+          <div style={styles.modalBackdrop}>
+            <div style={{ ...styles.modal, maxWidth: 460, textAlign: "center", display: "grid", gap: 12 }}>
+              <span style={{ color: "rgba(232, 216, 181, 0.68)", fontSize: 13, fontWeight: 800, textTransform: "uppercase" }}>Partie terminée</span>
+              <strong style={{ fontSize: 26, lineHeight: 1.1 }}>
+                {gameWinner ? `${gameWinner.name} gagne` : "Égalité"}
+              </strong>
+              <span style={{ color: "rgba(232, 216, 181, 0.78)", fontSize: 14 }}>
+                {[...(state.log ?? [])].reverse().find((entry) => entry.type === "game_finished")?.message ?? "La partie est finie."}
+              </span>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                {!isSpectator && (
+                  <button
+                    type="button"
+                    onClick={replayCurrentGame}
+                    style={{ ...styles.validateButton, width: "100%", justifySelf: "stretch" }}
+                  >
+                    Rejouer
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={returnToMenu}
+                  style={{ width: "100%", minHeight: 42 }}
+                >
+                  Menu
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && isMyDefenseTurn && (

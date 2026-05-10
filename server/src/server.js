@@ -14,10 +14,12 @@ import {
   drawTwentyOneTrumpCard,
   playAwaleMove,
   playTwentyOneTrump,
+  replayGame,
   resolveDefense,
   rooms,
   standTwentyOne,
   startGame,
+  spectateRoom,
   playersBySocketId
 } from "./game.js";
 
@@ -28,7 +30,7 @@ const httpServer = createServer();
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ["https://owlbear.sunitro.de", "http://localhost:5173"],
+    origin: ["https://owlbear.sunitro.de", "http://localhost:5173", "http://127.0.0.1:5173"],
     methods: ["GET", "POST"]
   }
 });
@@ -39,6 +41,9 @@ function emitRoomState(code) {
 
   for (const player of room.players) {
     io.to(player.socketId).emit("room:state", getVisibleState(room, player.id));
+  }
+  for (const spectator of room.spectators ?? []) {
+    io.to(spectator.socketId).emit("room:state", getVisibleState(room, null));
   }
 
   const lastLog = room.log[room.log.length - 1];
@@ -72,12 +77,33 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("room:spectate", ({ code, spectatorName }) => {
+    try {
+      const room = spectateRoom(code, socket.id, spectatorName || "Spectateur");
+      socket.join(room.code);
+      emitRoomState(room.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
   socket.on("game:start", ({ code }) => {
     try {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
       startGame(code, ref.playerId);
       emitRoomState(code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("game:replay", () => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      replayGame(ref.code, ref.playerId);
+      emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);
     }

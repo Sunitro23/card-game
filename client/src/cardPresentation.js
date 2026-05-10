@@ -145,8 +145,8 @@ export function previewCardFromVision(rawCard) {
 }
 
 export function getAwaleRowsForViewer(state, me) {
-  if (!state?.awale?.board || !me) return { myRow: [], opponentRow: [] };
-  const mySide = me.awaleSide;
+  if (!state?.awale?.board) return { myRow: [], opponentRow: [] };
+  const mySide = me?.awaleSide ?? 0;
   const opponentSide = mySide === 0 ? 1 : 0;
   const sideIndexes = (side) => (side === 0 ? [0, 1, 2, 3, 4, 5] : [6, 7, 8, 9, 10, 11]);
   return {
