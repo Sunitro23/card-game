@@ -666,6 +666,36 @@ const baseStyles = {
     fontWeight: 900,
     cursor: "pointer"
   },
+
+  twentyOneSideStats: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8
+  },
+  twentyOneSideStat: {
+    minHeight: 94,
+    borderRadius: 4,
+    border: "1px solid rgba(240, 138, 53, 0.38)",
+    background: "radial-gradient(circle at 50% 0%, rgba(240, 138, 53, 0.22), transparent 52%), linear-gradient(180deg, rgba(33, 23, 14, 0.96), rgba(8, 7, 6, 0.98))",
+    boxShadow: "inset 0 0 26px rgba(0,0,0,0.56)",
+    display: "grid",
+    alignContent: "center",
+    justifyItems: "center",
+    gap: 3,
+    padding: "10px 8px",
+    textAlign: "center"
+  },
+  twentyOneSideStatValue: {
+    color: "#fff0c9",
+    fontSize: 34,
+    fontWeight: 950,
+    lineHeight: 1
+  },
+  twentyOneSideStatHint: {
+    color: "rgba(232, 216, 181, 0.62)",
+    fontSize: 11,
+    fontWeight: 800
+  },
   twentyOneTrumpPanel: {
     borderRadius: 4,
     background: "linear-gradient(180deg, rgba(18, 15, 11, 0.94), rgba(7, 6, 5, 0.96))",

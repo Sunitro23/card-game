@@ -13,7 +13,9 @@ export function startTwentyOneGame(room) {
     trumpDeck: createTwentyOneTrumpDeck(),
     startingTurnIndex: room.turnIndex,
     winnerId: null,
-    lastRoundResult: null
+    lastRoundResult: null,
+    standStreak: 0,
+    lastStandPlayerId: null
   };
   room.players.forEach((p) => {
     p.hp = p.twentyOne?.lives ?? TWENTY_ONE_STARTING_LIVES;
@@ -81,6 +83,29 @@ function twentyOnePlayerState() {
   return { lives: TWENTY_ONE_STARTING_LIVES, cards: [], stood: false, manualStand: false, autoBust: false, lastTrump: null, bless: false, hasDrawnThisTurn: false };
 }
 
+function resetTwentyOneStandChain(room) {
+  room.twentyOne.standStreak = 0;
+  room.twentyOne.lastStandPlayerId = null;
+  for (const player of room.players) {
+    player.twentyOne.stood = false;
+    player.twentyOne.manualStand = false;
+  }
+}
+
+function recordTwentyOneStand(room, player) {
+  player.twentyOne.stood = true;
+  player.twentyOne.manualStand = true;
+  player.twentyOne.autoBust = false;
+
+  if (room.twentyOne.lastStandPlayerId && room.twentyOne.lastStandPlayerId !== player.id) {
+    room.twentyOne.standStreak += 1;
+  } else {
+    room.twentyOne.standStreak = 1;
+  }
+
+  room.twentyOne.lastStandPlayerId = player.id;
+}
+
 export function twentyOneTotal(player) {
   return twentyOneTotalForTarget(player, TWENTY_ONE_STARTING_TARGET);
 }
@@ -111,7 +136,6 @@ function isTwentyOneBust(player, target) {
 
 function refreshTwentyOneBustState(player, target) {
   player.twentyOne.autoBust = false;
-  if (!player.twentyOne.manualStand) player.twentyOne.stood = false;
 }
 
 function drawTwentyOneTrump(room, player, count = 1) {
@@ -167,6 +191,8 @@ function resetTwentyOneRound(room) {
   room.twentyOne.target = TWENTY_ONE_STARTING_TARGET;
   room.twentyOne.bet = TWENTY_ONE_STARTING_BET;
   room.twentyOne.numberDeck = createTwentyOneNumberDeck();
+  room.twentyOne.standStreak = 0;
+  room.twentyOne.lastStandPlayerId = null;
   room.twentyOne.startingTurnIndex = (room.twentyOne.startingTurnIndex + 1) % room.players.length;
   room.turnIndex = room.twentyOne.startingTurnIndex;
   for (const player of room.players) {
@@ -193,7 +219,7 @@ function ensureTwentyOneTurn(room, player) {
 
 function passTwentyOneTurn(room, player) {
   const currentIndex = room.players.findIndex((p) => p.id === player.id);
-  const nextIndex = room.players.findIndex((p, index) => index !== currentIndex && !p.twentyOne.manualStand);
+  const nextIndex = room.players.findIndex((p, index) => index !== currentIndex);
   if (nextIndex >= 0) {
     room.turnIndex = nextIndex;
     room.players[nextIndex].twentyOne.hasDrawnThisTurn = false;
@@ -295,8 +321,10 @@ function resolveTwentyOneRound(room) {
 }
 
 function checkTwentyOneRoundResolution(room) {
-  if (room.phase !== "twenty_one") return;
-  if (room.players.every((player) => player.twentyOne.manualStand === true)) resolveTwentyOneRound(room);
+  if (room.phase !== "twenty_one") return false;
+  if (room.twentyOne.standStreak < room.players.length) return false;
+  resolveTwentyOneRound(room);
+  return true;
 }
 
 export function drawTwentyOneNumberCard(code, playerId) {
@@ -307,14 +335,14 @@ export function drawTwentyOneNumberCard(code, playerId) {
   const actor = room.players.find((p) => p.id === playerId);
   if (!actor) throw new Error("Joueur introuvable.");
   ensureTwentyOneTurn(room, actor);
-  if (actor.twentyOne.manualStand || (actor.twentyOne.stood && !isTwentyOneBust(actor, room.twentyOne.target))) throw new Error("Vous avez déjà stand.");
   if (actor.twentyOne.autoBust || isTwentyOneBust(actor, room.twentyOne.target)) throw new Error("Vous êtes Bust : jouez une carte spéciale ou cliquez Rester.");
   if (actor.twentyOne.hasDrawnThisTurn) throw new Error("Vous avez déjà pioché pendant ce tour.");
 
   const card = drawTwentyOneNumber(room, actor);
   if (!card) throw new Error("Deck vide.");
   actor.twentyOne.hasDrawnThisTurn = true;
-  room.log.push({ at: Date.now(), type: "twenty_one_draw", message: `${actor.name} pioche une carte et passe son tour.` });
+  resetTwentyOneStandChain(room);
+  room.log.push({ at: Date.now(), type: "twenty_one_draw", message: `${actor.name} pioche une carte et passe son tour. La chaîne de Rester est remise à zéro.` });
 
   refreshTwentyOneBustState(actor, room.twentyOne.target);
   passTwentyOneTurn(room, actor);
@@ -338,13 +366,10 @@ export function standTwentyOne(code, playerId) {
   const actor = room.players.find((p) => p.id === playerId);
   if (!actor) throw new Error("Joueur introuvable.");
   ensureTwentyOneTurn(room, actor);
-  if (actor.twentyOne.manualStand || (actor.twentyOne.stood && !isTwentyOneBust(actor, room.twentyOne.target))) throw new Error("Vous avez déjà stand.");
-  actor.twentyOne.stood = true;
-  actor.twentyOne.manualStand = true;
-  actor.twentyOne.autoBust = false;
-  passTwentyOneTurn(room, actor);
+  recordTwentyOneStand(room, actor);
   room.log.push({ at: Date.now(), type: "twenty_one_stand", message: `${actor.name} reste a ${twentyOneTotalForTarget(actor, room.twentyOne.target)}.` });
-  checkTwentyOneRoundResolution(room);
+  const didResolveRound = checkTwentyOneRoundResolution(room);
+  if (!didResolveRound) passTwentyOneTurn(room, actor);
   return room;
 }
 
