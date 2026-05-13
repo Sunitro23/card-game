@@ -999,7 +999,8 @@ export function App() {
                 <span>Chaque manche vise la cible active. Les cartes Cible 17, 24 ou 27 peuvent la changer.</span>
                 <span>L'As vaut 1 ou 11 selon le meilleur total possible.</span>
                 <span>Chaque joueur commence avec 1 carte cachée et 1 carte visible. Le paquet de points contient une seule carte de chaque rang.</span>
-                <span>Le joueur actif peut piocher 1 seule fois : piocher passe directement au tour suivant. Il peut aussi jouer des cartes spéciales ou cliquer Rester.</span>
+                <span>La manche se résout uniquement quand les 2 joueurs cliquent Rester à la suite.</span>
+                <span>Piocher passe le tour, mais remet cette chaîne de Rester à zéro.</span>
                 <span>Le perdant perd la mise en vies; Grâce peut empêcher une mort.</span>
                 <span>Les cartes spéciales gardées restent en main. +3 cartes spéciales par manche, jusqu'à 6 en main.</span>
               </section>
@@ -1131,14 +1132,31 @@ export function App() {
                 </div>
               </div>
 
-              {me && (
-                <aside style={{ ...styles.twentyOneTrumpPanel, padding: isMobile ? 8 : styles.twentyOneTrumpPanel.padding, gap: isMobile ? 8 : styles.twentyOneTrumpPanel.gap }}>
-                  <div style={{ display: "grid", gap: 2 }}>
-                    <strong>Cartes spéciales</strong>
-                    {!isMobile && <span style={{ color: "rgba(232, 216, 181, 0.56)", fontSize: 12 }}>+3 par manche, 6 en main maximum.</span>}
+              <aside style={{ ...styles.twentyOneTrumpPanel, padding: isMobile ? 8 : styles.twentyOneTrumpPanel.padding, gap: isMobile ? 8 : styles.twentyOneTrumpPanel.gap }}>
+                  <div style={styles.twentyOneSideStats}>
+                    <div style={styles.twentyOneSideStat}>
+                      <span style={styles.twentyOneStatLabel}>Mise</span>
+                      <strong style={{ ...styles.twentyOneSideStatValue, fontSize: isMobile ? 28 : styles.twentyOneSideStatValue.fontSize }}>
+                        {state.twentyOne?.bet ?? 0}
+                      </strong>
+                      <span style={styles.twentyOneSideStatHint}>vie(s) en jeu</span>
+                    </div>
+                    <div style={styles.twentyOneSideStat}>
+                      <span style={styles.twentyOneStatLabel}>Cible</span>
+                      <strong style={{ ...styles.twentyOneSideStatValue, fontSize: isMobile ? 28 : styles.twentyOneSideStatValue.fontSize }}>
+                        {state.twentyOne?.target ?? 21}
+                      </strong>
+                      <span style={styles.twentyOneSideStatHint}>à approcher</span>
+                    </div>
                   </div>
-                  <div style={{ ...styles.twentyOneTrumpHand, gap: isMobile ? 4 : styles.twentyOneTrumpHand.gap }}>
-                    {me.hand.map((card) => {
+                  {me ? (
+                    <>
+                      <div style={{ display: "grid", gap: 2 }}>
+                        <strong>Cartes spéciales</strong>
+                        {!isMobile && <span style={{ color: "rgba(232, 216, 181, 0.56)", fontSize: 12 }}>+3 par manche, 6 en main maximum.</span>}
+                      </div>
+                      <div style={{ ...styles.twentyOneTrumpHand, gap: isMobile ? 4 : styles.twentyOneTrumpHand.gap }}>
+                        {me.hand.map((card) => {
                       const palette = soulsCardPalette(card);
                       const isActive = selectedTwentyOneTrump?.id === card.id;
                       const isBustStand = me?.twentyOne?.autoBust || ((me?.twentyOne?.total ?? 0) > (state.twentyOne?.target ?? 21));
@@ -1171,10 +1189,13 @@ export function App() {
                           <span style={{ ...styles.twentyOneTrumpIcon, fontSize: isMobile ? 36 : styles.twentyOneTrumpIcon.fontSize }}>{palette.icon}</span>
                         </button>
                       );
-                    })}
-                  </div>
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <span style={styles.twentyOneSideStatHint}>Mode spectateur : la mise reste visible pendant toute la manche.</span>
+                  )}
                 </aside>
-              )}
             </div>
 
             {state.phase === "finished" && (
