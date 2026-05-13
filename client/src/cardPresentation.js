@@ -21,7 +21,7 @@ export function cardPalette(card) {
 }
 
 export function cardLabel(card) {
-  if (card.type === "trump") return card.name ?? "Trump";
+  if (card.type === "trump") return card.name ?? "Carte spéciale";
   if (card.type === "defense") return friendlyDefenseName(card.defense);
   if (card.type === "utility") {
     if (card.utility === "critical") return "Critique";
@@ -34,42 +34,42 @@ export function cardLabel(card) {
 
 export function cardDetails(card) {
   if (card.type === "trump") {
-    if (card.trumpType === "add_number") return `Cherche un ${card.value} dans le deck numérique.`;
-    if (card.trumpType === "go_for") return `La cible devient ${card.target}.`;
-    if (card.action === "one_up") return "Augmente le bet de +1.";
-    if (card.action === "shield") return "Diminue le bet de -1.";
-    if (card.action === "bless") return "Te sauve si tu devais mourir.";
-    if (card.action === "bloodshed") return "Bet +1, sans pioche de Trump.";
-    if (card.action === "destroy") return "Détruit le dernier Trump adverse.";
-    if (card.action === "friendship") return "Effet sans pioche de Trump.";
-    if (card.action === "reincarnation") return "Destroy, sans pioche de Trump.";
-    if (card.action === "hush") return "Pioche une carte numérique cachée.";
-    if (card.action === "perfect_draw") return "Meilleure carte s?re vers la cible.";
-    if (card.action === "refresh") return "Reset tes cartes numériques puis pioche 2.";
-    if (card.action === "remove") return "Retire la derni?re carte adverse.";
-    if (card.action === "return") return "Retire ta derni?re carte.";
-    if (card.action === "exchange") return "?change les derni?res cartes.";
-    if (card.action === "disservice") return "Force l'adversaire ? piocher.";
-    return "Trump Twenty One.";
+    if (card.trumpType === "add_number") return `Ajoute un ${card.value} à tes cartes, si cette valeur est encore disponible.`;
+    if (card.trumpType === "go_for") return `Change la cible de la manche : il faut maintenant se rapprocher de ${card.target}.`;
+    if (card.action === "one_up") return "Augmente la mise de 1 : le perdant de la manche perdra 1 vie de plus.";
+    if (card.action === "shield") return "Réduit la mise de 1, sans descendre sous 0 : le perdant perdra moins de vies.";
+    if (card.action === "bless") return "Protection : si tu devais tomber à 0 vie cette manche, tu restes à 1 vie et la protection disparaît.";
+    if (card.action === "bloodshed") return "Augmente la mise de 1. Aucun autre bonus de pioche spéciale n'est ajouté.";
+    if (card.action === "destroy") return "Annule la dernière carte spéciale adverse annulable et retire son effet si possible.";
+    if (card.action === "friendship") return "Carte neutre : elle compte comme dernière carte spéciale jouée sans changer immédiatement la manche.";
+    if (card.action === "reincarnation") return "Annule la dernière carte spéciale adverse annulable, sans autre bonus de pioche spéciale.";
+    if (card.action === "hush") return "Ajoute une carte cachée à ton total : toi seul vois sa valeur.";
+    if (card.action === "perfect_draw") return "Ajoute la meilleure carte disponible qui rapproche ton total de la cible sans la dépasser.";
+    if (card.action === "refresh") return "Remet toutes tes cartes dans le paquet, puis pioche 2 nouvelles cartes visibles.";
+    if (card.action === "remove") return "Retire la dernière carte de l'adversaire et la remet dans le paquet.";
+    if (card.action === "return") return "Retire ta dernière carte et la remet dans le paquet.";
+    if (card.action === "exchange") return "Échange ta dernière carte avec la dernière carte adverse. Les deux cartes deviennent visibles.";
+    if (card.action === "disservice") return "Force l'adversaire à ajouter une carte visible à son total.";
+    return "Carte spéciale Twenty One.";
   }
-  if (card.type === "defense" && card.value) return `R?duction: ${card.value}`;
-  if (card.type === "utility" && card.utility === "critical") return "Double les d?g?ts de ta prochaine attaque.";
-  if (card.type === "utility" && card.utility === "vision") return "R?v?le la main adverse pendant ce tour.";
-  if (card.type === "utility" && card.utility === "steal") return "Vole une carte al?atoire dans la main ennemie.";
+  if (card.type === "defense" && card.value) return `Réduction : ${card.value}`;
+  if (card.type === "utility" && card.utility === "critical") return "Double les dégâts de ta prochaine attaque.";
+  if (card.type === "utility" && card.utility === "vision") return "Révèle la main adverse pendant ce tour.";
+  if (card.type === "utility" && card.utility === "steal") return "Vole une carte aléatoire dans la main ennemie.";
   return "";
 }
 
 export function trumpShortEffect(card) {
   if (card.type !== "trump") return "";
-  if (card.trumpType === "add_number") return `+${card.value} choisi`;
+  if (card.trumpType === "add_number") return `${card.value} précis`;
   if (card.trumpType === "go_for") return `Cible ${card.target}`;
   if (card.action === "one_up" || card.action === "bloodshed") return "+1 mise";
   if (card.action === "shield") return "-1 mise";
   if (card.action === "bless") return "Sauve 1 vie";
-  if (card.action === "destroy" || card.action === "reincarnation") return "Détruit";
-  if (card.action === "hush") return "Pioche cachée";
+  if (card.action === "destroy" || card.action === "reincarnation") return "Annule";
+  if (card.action === "hush") return "Ajout caché";
   if (card.action === "perfect_draw") return "Carte sûre";
-  if (card.action === "refresh") return "Reset +2";
+  if (card.action === "refresh") return "Remet +2";
   if (card.action === "remove") return "Retire adverse";
   if (card.action === "return") return "Retire à toi";
   if (card.action === "exchange") return "Échange";

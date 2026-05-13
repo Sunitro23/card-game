@@ -49,7 +49,7 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - `combat:defend` `{ code, attackId, defenseCardId? }`
 - `awale:move` `{ pitIndex }`
 - `twentyone:draw-number`
-- `twentyone:draw-trump`
+- `twentyone:draw-trump` (événement historique côté API; la pioche manuelle des cartes spéciales est refusée)
 - `twentyone:play-trump` `{ cardId }`
 - `twentyone:stand`
 - `game:abort`
@@ -73,10 +73,10 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 ## Mode Twenty One intégré côté serveur
 
 - Duel 1 contre 1 en manches, avec 3 vies par joueur et une cible de base à 21.
-- Chaque joueur construit son total avec des cartes numériques; le meilleur total est celui le plus proche de la cible active.
-- Les Go For peuvent déplacer la cible vers 17, 24 ou 27, et le bet de la manche commence à 1.
-- Les Trumps Add Number, Go For, Bet et Deck sont jouables depuis la main : Add Number tente de récupérer une valeur précise, Bless peut sauver une mort, Destroy/Reincarnation annulent le dernier Trump adverse, et les Trumps Deck manipulent les dernières cartes numériques ou la pioche.
-- À la résolution d'une manche, le perdant perd le bet en vies; une égalité relance une nouvelle manche.
+- Chaque joueur construit son total avec des cartes de points; le meilleur total est celui le plus proche de la cible active.
+- Les cartes Cible peuvent déplacer la cible vers 17, 24 ou 27, et la mise de la manche commence à 1.
+- Les cartes spéciales se jouent depuis la main : les cartes de valeur ajoutent une valeur précise, Grâce peut sauver une mort, Briser/Renaissance annulent la dernière carte spéciale adverse annulable, et les effets de paquet manipulent les dernières cartes de points ou la pioche.
+- À la résolution d'une manche, le perdant perd la mise en vies; une égalité relance une nouvelle manche.
 
 ## Règles MVP intégrées côté serveur
 
