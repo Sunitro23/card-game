@@ -996,11 +996,11 @@ export function App() {
             {showTwentyOneRules && (
               <section style={{ ...styles.ruleBox, borderColor: "rgba(216, 201, 167, 0.16)", background: "rgba(10, 9, 7, 0.7)", fontSize: isMobile ? 12 : styles.ruleBox.fontSize, padding: isMobile ? 8 : styles.ruleBox.padding }}>
                 <strong>Règles Twenty One</strong>
-                <span>Chaque manche vise la cible active. Les Go For peuvent la changer en 17, 24 ou 27.</span>
+                <span>Chaque manche vise la cible active. Les cartes Cible 17, 24 ou 27 peuvent la changer.</span>
                 <span>L'As vaut 1 ou 11 selon le meilleur total possible.</span>
-                <span>Chaque joueur commence avec 2 cartes cachees. Le paquet numerique contient une seule carte de chaque rang.</span>
-                <span>Le joueur actif peut piocher autant qu'il veut, puis cliquer Rester pour passer la main.</span>
-                <span>Le perdant perd la mise en vies; Bless peut empêcher une mort.</span>
+                <span>Chaque joueur commence avec 1 carte cachée et 1 carte visible. Le paquet de points contient une seule carte de chaque rang.</span>
+                <span>Le joueur actif peut piocher 1 seule fois : piocher passe directement au tour suivant. Il peut aussi jouer des cartes spéciales ou cliquer Rester.</span>
+                <span>Le perdant perd la mise en vies; Grâce peut empêcher une mort.</span>
                 <span>Les cartes spéciales gardées restent en main. +3 cartes spéciales par manche, jusqu'à 6 en main.</span>
               </section>
             )}
@@ -1012,7 +1012,7 @@ export function App() {
                 padding: isMobile ? "7px 8px" : styles.awaleTurnHint.padding
               }}
             >
-              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "A toi de jouer : pioche autant que tu veux, puis clique Rester." : state.phase === "finished" ? "Partie terminee." : "Tour adverse."}
+              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "À toi de jouer : pioche 1 fois pour passer, joue une carte spéciale ou clique Rester." : state.phase === "finished" ? "Partie terminée." : "Tour adverse."}
             </div>
 
             <div
@@ -1029,7 +1029,7 @@ export function App() {
                   const target = state.twentyOne?.target ?? 21;
                   const busted = total > target;
                   const playerStatus = player.twentyOne?.stood ? "Reste" : player.id === state.turnPlayerId && state.phase !== "finished" ? "Tour actif" : busted ? "Bust" : "";
-                  const playerNote = [playerStatus, player.twentyOne?.bless ? "Bless" : ""].filter(Boolean).join(" · ");
+                  const playerNote = [playerStatus, player.twentyOne?.bless ? "Grâce" : ""].filter(Boolean).join(" · ");
                   return (
                     <div key={player.id} style={{ ...styles.twentyOnePlayerPanel, borderTop: isSelf ? 0 : styles.twentyOnePlayerPanel.borderTop, padding: isMobile ? "4px 0" : styles.twentyOnePlayerPanel.padding }}>
                       <div
@@ -1098,19 +1098,19 @@ export function App() {
                     <button
                       className="twenty-one-action"
                       onClick={drawTwentyOneNumber}
-                      disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
+                      disabled={!isMyTurn || me?.twentyOne?.stood || me?.twentyOne?.hasDrawnThisTurn || state.phase === "finished"}
                       style={{
                         ...styles.twentyOneDrawAction,
                         minHeight: isMobile ? 54 : styles.twentyOneDrawAction.minHeight,
                         gridTemplateColumns: isMobile ? "28px 1fr" : styles.twentyOneDrawAction.gridTemplateColumns,
                         padding: isMobile ? "6px 8px" : undefined,
-                        opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1
+                        opacity: !isMyTurn || me?.twentyOne?.stood || me?.twentyOne?.hasDrawnThisTurn || state.phase === "finished" ? 0.6 : 1
                       }}
                     >
                       <span style={{ fontSize: isMobile ? 21 : 28, lineHeight: 1 }}>🂡</span>
                       <span>
                         <span style={{ display: "block", fontSize: isMobile ? 14 : 17 }}>Piocher</span>
-                        <span style={{ display: "block", fontSize: isMobile ? 10 : 12, color: "rgba(255,240,201,0.72)" }}>Carte</span>
+                        <span style={{ display: "block", fontSize: isMobile ? 10 : 12, color: "rgba(255,240,201,0.72)" }}>1 fois puis passe</span>
                       </span>
                     </button>
                     <button
@@ -1514,6 +1514,7 @@ export function App() {
               <div style={{ fontSize: 42, lineHeight: 1 }}>{specialCardIcon(trumpPopup.card ?? { type: "trump" })}</div>
               <h3 style={{ margin: "6px 0" }}>Carte spéciale jouée</h3>
               <strong style={{ fontSize: 22 }}>{trumpPopup.card?.name ?? "Carte spéciale"}</strong>
+              <p style={{ margin: "8px 0 0", fontWeight: 700 }}>{cardDetails(trumpPopup.card ?? { type: "trump" })}</p>
               <p style={{ marginBottom: 0 }}>{trumpPopup.message}</p>
             </div>
           </div>

@@ -178,6 +178,7 @@ export function getVisibleState(room, playerId) {
             manualStand: Boolean(p.twentyOne.manualStand),
             autoBust: p.twentyOne.autoBust,
             bless: p.twentyOne.bless,
+            hasDrawnThisTurn: Boolean(p.twentyOne.hasDrawnThisTurn),
             cards: p.twentyOne.cards.map((card) => ({
               id: card.id,
               value: p.id === playerId || !card.hidden ? card.value : null,
