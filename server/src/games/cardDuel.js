@@ -1,10 +1,11 @@
-import { ATTACKS, STARTING_HP } from "../core/constants.js";
+import { ATTACKS, MAX_HAND_SIZE, STARTING_HP } from "../core/constants.js";
 import { rooms } from "../core/state.js";
-import { rollDie } from "../core/random.js";
+import { rollDie, uid } from "../core/random.js";
 import { addToHandRespectingLimits, createDeck, drawRaw, getCurrentPlayer, getOpponent, removeCardFromHand, spendEnergy, startTurn } from "../core/players.js";
 
 export function startCardDuelGame(room) {
   room.phase = "combat";
+  room.cardDuel = { lastEvent: null };
   room.players.forEach((p) => {
     p.hp = STARTING_HP;
     p.energy = 0;
@@ -16,7 +17,7 @@ export function startCardDuelGame(room) {
     addToHandRespectingLimits(room, p, drawRaw(p, 1));
   });
 
-  room.log.push({ at: Date.now(), type: "game_started", message: "Combat lancÃ©. Chaque joueur pioche 1 carte." });
+  room.log.push({ at: Date.now(), type: "game_started", message: "Combat lance. Chaque joueur pioche 1 carte." });
   startTurn(room);
   return room;
 }
@@ -24,8 +25,8 @@ export function startCardDuelGame(room) {
 export function drawCard(code, playerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.phase !== "combat") throw new Error("Le combat n'a pas commencé.");
-  if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
+  if (room.phase !== "combat") throw new Error("Le combat n'a pas commence.");
+  if (room.pendingAttack) throw new Error("Une attaque est en attente de defense.");
 
   const actor = room.players.find((p) => p.id === playerId);
   const current = getCurrentPlayer(room);
@@ -35,15 +36,15 @@ export function drawCard(code, playerId) {
   spendEnergy(actor, 1);
   const drawn = drawRaw(actor, 1);
   addToHandRespectingLimits(room, actor, drawn);
-  room.log.push({ at: Date.now(), type: "draw", message: `${actor.name} pioche (coût 1 énergie).` });
+  room.log.push({ at: Date.now(), type: "draw", message: `${actor.name} pioche (cout 1 energie).` });
   return room;
 }
 
 export function performAttack(code, playerId, { attackType, targetPlayerId }) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.phase !== "combat") throw new Error("Le combat n'a pas commencé.");
-  if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
+  if (room.phase !== "combat") throw new Error("Le combat n'a pas commence.");
+  if (room.pendingAttack) throw new Error("Une attaque est en attente de defense.");
 
   const actor = room.players.find((p) => p.id === playerId);
   const current = getCurrentPlayer(room);
@@ -63,15 +64,15 @@ export function performAttack(code, playerId, { attackType, targetPlayerId }) {
     card: attack
   };
 
-  room.log.push({ at: Date.now(), type: "attack_declared", message: `${actor.name} lance ${attack.label} (coût 1 énergie).` });
+  room.log.push({ at: Date.now(), type: "attack_declared", message: `${actor.name} lance ${attack.label} (cout 1 energie).` });
   return room;
 }
 
 export function playCard(code, playerId, { cardId, targetPlayerId }) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.phase !== "combat") throw new Error("Le combat n'a pas commencé.");
-  if (room.pendingAttack) throw new Error("Une attaque est en attente de défense.");
+  if (room.phase !== "combat") throw new Error("Le combat n'a pas commence.");
+  if (room.pendingAttack) throw new Error("Une attaque est en attente de defense.");
 
   const actor = room.players.find((p) => p.id === playerId);
   const current = getCurrentPlayer(room);
@@ -87,7 +88,7 @@ export function playCard(code, playerId, { cardId, targetPlayerId }) {
 
   if (card.utility === "critical") {
     actor.status.nextCritical = true;
-    room.log.push({ at: Date.now(), type: "buff", message: `${actor.name} prépare un coup critique.` });
+    room.log.push({ at: Date.now(), type: "buff", message: `${actor.name} prepare un coup critique.` });
   } else if (card.utility === "vision") {
     actor.status.visionActive = true;
     room.log.push({ at: Date.now(), type: "vision", message: `${actor.name} active Vision et voit la main adverse.` });
@@ -120,7 +121,7 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   if (!room?.pendingAttack) throw new Error("Aucune attaque en attente.");
 
   const attack = room.pendingAttack;
-  if (attack.targetId !== defenderId) throw new Error("Pas votre défense.");
+  if (attack.targetId !== defenderId) throw new Error("Pas votre defense.");
 
   const attacker = room.players.find((p) => p.id === attack.attackerId);
   const defender = room.players.find((p) => p.id === defenderId);
@@ -129,16 +130,19 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   let defenseCard = null;
   if (defenseCardId) {
     defenseCard = removeCardFromHand(defender, defenseCardId);
-    if (defenseCard.type !== "defense") throw new Error("La carte n'est pas défensive.");
+    if (defenseCard.type !== "defense") throw new Error("La carte n'est pas defensive.");
   }
 
-  let damage = rollDie(attack.card.dieSides);
+  const rolledDamage = rollDie(attack.card.dieSides);
+  let damage = rolledDamage;
   if (attacker.status.nextCritical) {
     damage *= 2;
     attacker.status.nextCritical = false;
   }
 
   let reflectedDamage = 0;
+  let resultType = defenseCard ? defenseCard.defense : "no_defense";
+  let counterFailed = false;
 
   if (defenseCard?.defense === "dodge") {
     damage = 0;
@@ -153,7 +157,9 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
       reflectedDamage = rollDie(6);
       damage = 0;
     } else {
-      room.log.push({ at: Date.now(), type: "counter_fail", message: `${defender.name} rate son contre mêlée.` });
+      counterFailed = true;
+      resultType = "counter_fail";
+      room.log.push({ at: Date.now(), type: "counter_fail", message: `${defender.name} rate son contre melee.` });
     }
   }
 
@@ -162,6 +168,8 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
       reflectedDamage = rollDie(6);
       damage = 0;
     } else {
+      counterFailed = true;
+      resultType = "counter_fail";
       room.log.push({ at: Date.now(), type: "counter_fail", message: `${defender.name} rate son contre magique.` });
     }
   }
@@ -169,7 +177,7 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   defender.hp = Math.max(0, defender.hp - damage);
   if (reflectedDamage > 0) {
     attacker.hp = Math.max(0, attacker.hp - reflectedDamage);
-    room.log.push({ at: Date.now(), type: "counter", message: `${defender.name} contre et renvoie ${reflectedDamage} dégâts.` });
+    room.log.push({ at: Date.now(), type: "counter", message: `${defender.name} contre et renvoie ${reflectedDamage} degats.` });
   }
 
   if (defenseCard) defender.discard.push(defenseCard);
@@ -177,8 +185,26 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
   room.log.push({
     at: Date.now(),
     type: "attack_resolved",
-    message: `${attacker.name} inflige ${damage} dégâts à ${defender.name}.`
+    message: `${attacker.name} inflige ${damage} degats a ${defender.name}.`
   });
+  room.cardDuel = {
+    ...(room.cardDuel ?? {}),
+    lastEvent: {
+      id: uid("duel_event"),
+      type: resultType,
+      counterFailed,
+      attackType: attack.card.type,
+      attackLabel: attack.card.label,
+      attackerId: attacker.id,
+      attackerName: attacker.name,
+      defenderId: defender.id,
+      defenderName: defender.name,
+      defense: defenseCard?.defense ?? null,
+      damage,
+      reflectedDamage,
+      rolledDamage
+    }
+  };
 
   room.pendingAttack = null;
   if (defender.hp <= 0 || attacker.hp <= 0) {
@@ -190,13 +216,13 @@ export function resolveDefense(code, defenderId, defenseCardId = null) {
 }
 
 export function mulligan() {
-  throw new Error("Le mulligan est désactivé dans ce mode.");
+  throw new Error("Le mulligan est desactive dans ce mode.");
 }
 
 export function endTurn(code, playerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.pendingAttack) throw new Error("Résolvez l'attaque avant de finir le tour.");
+  if (room.pendingAttack) throw new Error("Resolvez l'attaque avant de finir le tour.");
 
   const current = getCurrentPlayer(room);
   if (current.id !== playerId) throw new Error("Ce n'est pas votre tour.");
@@ -207,4 +233,3 @@ export function endTurn(code, playerId) {
 
   return room;
 }
-

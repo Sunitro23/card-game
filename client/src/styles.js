@@ -228,12 +228,25 @@ const baseStyles = {
     background: "linear-gradient(180deg, rgba(8, 8, 7, 0.94), rgba(38, 28, 19, 0.86))",
     color: "#efe0bf",
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     fontWeight: 700,
     fontSize: 13,
     textAlign: "center",
+    gap: 4,
     padding: 8
+  },
+  arenaSlotLabel: {
+    color: "rgba(232, 216, 181, 0.62)",
+    fontSize: 11,
+    fontWeight: 900,
+    textTransform: "uppercase"
+  },
+  arenaSlotMeta: {
+    color: "rgba(232, 216, 181, 0.72)",
+    fontSize: 12,
+    fontWeight: 800
   },
   drawDeckButton: {
     width: 122,
@@ -754,6 +767,39 @@ const baseStyles = {
   twentyOneWinnerMeta: {
     color: "rgba(232, 216, 181, 0.8)",
     fontSize: 14
+  },
+  duelResultPopup: {
+    position: "fixed",
+    left: "50%",
+    top: "50%",
+    transform: "translate(-50%, -50%)",
+    zIndex: 45,
+    minWidth: "min(92vw, 420px)",
+    borderRadius: 4,
+    border: "1px solid rgba(240, 138, 53, 0.72)",
+    background: "radial-gradient(circle at 50% 0%, rgba(240, 138, 53, 0.28), transparent 42%), linear-gradient(160deg, rgba(44, 31, 20, 0.98), rgba(7, 6, 5, 0.98))",
+    color: "#fff0c9",
+    boxShadow: "0 24px 58px rgba(0,0,0,0.72), inset 0 0 44px rgba(0,0,0,0.62)",
+    padding: "18px 20px",
+    display: "grid",
+    gap: 5,
+    textAlign: "center",
+    overflow: "hidden"
+  },
+  duelResultTitle: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontSize: 26,
+    lineHeight: 1.05,
+    color: "#fff0c9"
+  },
+  duelResultMeta: {
+    color: "rgba(232, 216, 181, 0.62)",
+    fontSize: 12,
+    fontWeight: 800,
+    textTransform: "uppercase"
   },
   log: {
     marginTop: 10,

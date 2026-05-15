@@ -18,7 +18,7 @@ export function App() {
   const [copyFeedback, setCopyFeedback] = React.useState("");
   const [showAwaleRules, setShowAwaleRules] = React.useState(false);
   const [showTwentyOneRules, setShowTwentyOneRules] = React.useState(false);
-  const [defenseToast, setDefenseToast] = React.useState("");
+  const [duelResultPopup, setDuelResultPopup] = React.useState(null);
   const [trumpPopup, setTrumpPopup] = React.useState(null);
   const [twentyOneResultToast, setTwentyOneResultToast] = React.useState(null);
   const getViewportState = React.useCallback(() => ({
@@ -133,15 +133,13 @@ export function App() {
   }, [me, activeCardId]);
 
   React.useEffect(() => {
-    const lastLog = state?.log?.[state.log.length - 1];
-    if (!lastLog) return;
+    const event = state?.cardDuel?.lastEvent;
+    if (!event?.id || state?.gameType !== "card_duel") return;
 
-    if (["counter", "counter_fail", "attack_resolved"].includes(lastLog.type)) {
-      setDefenseToast(lastLog.message);
-      const timer = setTimeout(() => setDefenseToast(""), 1800);
-      return () => clearTimeout(timer);
-    }
-  }, [state?.log]);
+    setDuelResultPopup(event);
+    const timer = setTimeout(() => setDuelResultPopup(null), 3200);
+    return () => clearTimeout(timer);
+  }, [state?.cardDuel?.lastEvent?.id, state?.gameType]);
 
   React.useEffect(() => {
     const lastLog = state?.log?.[state.log.length - 1];
@@ -290,6 +288,58 @@ export function App() {
 
     setActiveCardId(card.id);
   }
+
+  function duelResultCopy(event) {
+    if (!event) return null;
+    const defender = event.defenderId === me?.id ? "Tu" : event.defenderName;
+    const attacker = event.attackerId === me?.id ? "Tu" : event.attackerName;
+
+    if (event.type === "dodge") {
+      return {
+        label: "Esquive",
+        title: `${defender} esquive l'attaque`,
+        detail: "Aucun degat subi.",
+        meta: `${event.attackLabel} evitee`,
+        icon: "↺"
+      };
+    }
+    if (event.type === "block") {
+      return {
+        label: "Blocage",
+        title: `${defender} bloque`,
+        detail: event.damage > 0 ? `${event.damage} degat(s) passent.` : "Tout est absorbe.",
+        meta: `${event.attackLabel} reduite`,
+        icon: "▣"
+      };
+    }
+    if (event.type === "counter_melee" || event.type === "counter_magic") {
+      return {
+        label: "Contre reussi",
+        title: `${defender} contre`,
+        detail: `${event.reflectedDamage} degat(s) renvoyes a ${attacker}.`,
+        meta: "L'attaque est annulee",
+        icon: "⚔"
+      };
+    }
+    if (event.type === "counter_fail") {
+      return {
+        label: "Contre rate",
+        title: `${defender} rate son contre`,
+        detail: `${event.damage} degat(s) subis.`,
+        meta: `${event.attackLabel} touche`,
+        icon: "!"
+      };
+    }
+    return {
+      label: "Impact",
+      title: `${attacker} touche ${defender}`,
+      detail: `${event.damage} degat(s) subis.`,
+      meta: "Aucune defense jouee",
+      icon: "✦"
+    };
+  }
+
+  const duelResult = duelResultCopy(duelResultPopup);
 
   return (
     <main style={{ ...styles.page, padding: isMobilePortrait ? 0 : isMobile ? 6 : isMobileLandscape ? 4 : styles.page.padding }}>
@@ -1000,6 +1050,7 @@ export function App() {
                 <span>L'As vaut 1 ou 11 selon le meilleur total possible.</span>
                 <span>Chaque joueur commence avec 2 cartes cachees. Le paquet numerique contient une seule carte de chaque rang.</span>
                 <span>Le joueur actif peut piocher autant qu'il veut, puis cliquer Rester pour passer la main.</span>
+                <span>Si les deux joueurs restent sans jouer de carte pendant la manche, elle se termine sans perte de vie.</span>
                 <span>Le perdant perd la mise en vies; Bless peut empêcher une mort.</span>
                 <span>Les cartes spéciales gardées restent en main. +3 cartes spéciales par manche, jusqu'à 6 en main.</span>
               </section>
@@ -1300,8 +1351,12 @@ export function App() {
                   </button>
                 </div>
                 {pendingAttack && (
-                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 66 : isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
-                    {`${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}`}
+                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 150 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 76 : isMobile ? 86 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
+                    <span style={styles.arenaSlotLabel}>Defense en attente</span>
+                    <strong>{pendingAttack.card.label}</strong>
+                    <span style={styles.arenaSlotMeta}>
+                      cible: {isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "adversaire"}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1397,7 +1452,7 @@ export function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isTwentyOneGame && (
+        {state && !isLobbyPhase && isAwaleGame && (
           <section style={{ ...styles.log, marginTop: isMobilePortrait ? 8 : styles.log.marginTop, maxHeight: isMobilePortrait ? 130 : styles.log.maxHeight, fontSize: isMobilePortrait ? 12 : styles.log.fontSize }}>
             <strong>Journal</strong>
             <ul>
@@ -1504,8 +1559,39 @@ export function App() {
           </div>
         )}
 
-        {defenseToast && (
-          <div style={styles.defenseToast}>{defenseToast}</div>
+        {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && duelResult && (
+          <div
+            key={duelResultPopup.id}
+            className={`twenty-one-winner-toast duel-result-popup${duelResultPopup.type === "counter_fail" ? " is-tie" : ""}`}
+            style={styles.duelResultPopup}
+          >
+            <span style={styles.twentyOneWinnerSparks} aria-hidden="true">
+              {[
+                [-112, -28],
+                [-72, 42],
+                [-24, -58],
+                [32, 58],
+                [76, -36],
+                [112, 22]
+              ].map(([x, y], index) => (
+                <span
+                  key={`${duelResultPopup.id}-${index}`}
+                  className="twenty-one-result-spark"
+                  style={{
+                    "--spark-x": `${x}px`,
+                    "--spark-y": `${y}px`,
+                    "--spark-delay": `${index * 70}ms`
+                  }}
+                />
+              ))}
+            </span>
+            <span style={styles.twentyOneWinnerLabel}>{duelResult.label}</span>
+            <strong style={styles.duelResultTitle}>
+              <span aria-hidden="true">{duelResult.icon}</span> {duelResult.title}
+            </strong>
+            <span style={styles.twentyOneWinnerMeta}>{duelResult.detail}</span>
+            <span style={styles.duelResultMeta}>{duelResult.meta}</span>
+          </div>
         )}
 
         {trumpPopup && (
