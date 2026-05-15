@@ -1,18 +1,19 @@
 import React from "react";
-import { socket } from "./socket.js";
 import { GAME_CHOICES } from "./gameChoices.js";
 import { styles } from "./styles.js";
 import { theme } from "./theme.js";
 import { AwaleDirectionRow, AwaleMiddleFlow, AwalePit } from "./awaleView.jsx";
-import { cardDetails, cardLabel, canDefenseCardAnswerAttack, getAwaleRowsForViewer, previewCardFromVision, soulsAttackCardTheme, soulsCardPalette, specialCardIcon, trumpShortEffect } from "./cardPresentation.js";
+import { cardDetails, cardLabel, previewCardFromVision, soulsAttackCardTheme, soulsCardPalette, specialCardIcon, trumpShortEffect } from "./cardPresentation.js";
+import { getAwaleRows, getDefenseCards, getGameWinner, getInvalidDefenseCards, getIsSpectator, getMe, getOpponents, getSelectedTwentyOneTrump, getTwentyOneWinner, getValidDefenseCards, getVisibleDuelPlayers } from "./selectors.js";
+import { useRoomSocket } from "./useRoomSocket.js";
+import { useViewport } from "./useViewport.js";
 
 export function App() {
   const [name, setName] = React.useState("Joueur");
   const [code, setCode] = React.useState("");
   const [gameType, setGameType] = React.useState("card_duel");
   const [roomAction, setRoomAction] = React.useState("join");
-  const [state, setState] = React.useState(null);
-  const [error, setError] = React.useState("");
+  const { state, setState, error, setError, ensureConnection, emit, disconnect } = useRoomSocket();
   const [activeCardId, setActiveCardId] = React.useState(null);
   const [hoveredTrump, setHoveredTrump] = React.useState(null);
   const [copyFeedback, setCopyFeedback] = React.useState("");
@@ -21,68 +22,14 @@ export function App() {
   const [defenseToast, setDefenseToast] = React.useState("");
   const [trumpPopup, setTrumpPopup] = React.useState(null);
   const [twentyOneResultToast, setTwentyOneResultToast] = React.useState(null);
-  const getViewportState = React.useCallback(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight
-  }), []);
-  const [viewport, setViewport] = React.useState(getViewportState);
+  const { viewport, isMobile, isMobilePortrait, isMobileLandscape } = useViewport();
 
-  React.useEffect(() => {
-    const onResize = () => setViewport(getViewportState());
-    window.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("resize", onResize);
-    onResize();
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("resize", onResize);
-    };
-  }, [getViewportState]);
-
-  const isMobile = viewport.width <= 700;
-  const isMobilePortrait = isMobile && viewport.height >= viewport.width;
-  const isMobileLandscape = viewport.width <= 950 && viewport.height <= 520 && viewport.width > viewport.height;
-
-  React.useEffect(() => {
-    const onRoomState = (nextState) => {
-      setState(nextState);
-      setError("");
-    };
-
-    const onGameError = (e) => {
-      setError(e?.message ?? "Erreur inconnue.");
-    };
-
-    socket.on("room:state", onRoomState);
-    socket.on("game:error", onGameError);
-
-    return () => {
-      socket.off("room:state", onRoomState);
-      socket.off("game:error", onGameError);
-    };
-  }, []);
-
-  const me = React.useMemo(() => {
-    if (!state) return null;
-    return state.players.find((p) => p.hand);
-  }, [state]);
-  const isSpectator = state?.viewerRole === "spectator" || Boolean(state && !me);
-
-  const opponents = React.useMemo(() => {
-    if (!state || !me) return [];
-    return state.players.filter((p) => p.id !== me.id);
-  }, [state, me]);
-  const visibleDuelPlayers = React.useMemo(() => {
-    if (!state) return [];
-    return me ? [opponents[0], me].filter(Boolean) : state.players;
-  }, [state, me, opponents]);
-  const selectedTwentyOneTrump = React.useMemo(() => {
-    const active = me?.hand?.find((card) => card.id === activeCardId && card.type === "trump");
-    return active ?? me?.hand?.find((card) => card.type === "trump") ?? null;
-  }, [activeCardId, me]);
-  const twentyOneWinner = React.useMemo(() => {
-    if (!state?.twentyOne?.winnerId) return null;
-    return state.players.find((player) => player.id === state.twentyOne.winnerId) ?? null;
-  }, [state]);
+  const me = React.useMemo(() => getMe(state), [state]);
+  const isSpectator = getIsSpectator(state, me);
+  const opponents = React.useMemo(() => getOpponents(state, me), [state, me]);
+  const visibleDuelPlayers = React.useMemo(() => getVisibleDuelPlayers(state, me, opponents), [state, me, opponents]);
+  const selectedTwentyOneTrump = React.useMemo(() => getSelectedTwentyOneTrump(me, activeCardId), [activeCardId, me]);
+  const twentyOneWinner = React.useMemo(() => getTwentyOneWinner(state), [state]);
 
   const pendingAttack = state?.pendingAttack;
   const isMyTurn = Boolean(state && me && state.turnPlayerId === me.id);
@@ -92,34 +39,11 @@ export function App() {
   const isTwentyOneGame = state?.gameType === "twenty_one";
   const isHost = Boolean(state && me && state.hostPlayerId === me.id);
   const selectedMode = GAME_CHOICES.find((choice) => choice.id === gameType) ?? GAME_CHOICES[0];
-  const defenseCards = React.useMemo(
-    () => me?.hand?.filter((c) => c.type === "defense") ?? [],
-    [me]
-  );
-
-  const validDefenseCards = React.useMemo(() => {
-    if (!pendingAttack) return [];
-    return defenseCards.filter((card) => canDefenseCardAnswerAttack(card, pendingAttack.card.type));
-  }, [defenseCards, pendingAttack]);
-
-  const invalidDefenseCards = React.useMemo(() => {
-    if (!pendingAttack) return [];
-    return defenseCards.filter((card) => !canDefenseCardAnswerAttack(card, pendingAttack.card.type));
-  }, [defenseCards, pendingAttack]);
-
-  const awaleRows = React.useMemo(() => getAwaleRowsForViewer(state, me), [state, me]);
-  const gameWinner = React.useMemo(() => {
-    if (!state || state.phase !== "finished") return null;
-    if (state.gameType === "twenty_one" && state.twentyOne?.winnerId) {
-      return state.players.find((player) => player.id === state.twentyOne.winnerId) ?? null;
-    }
-    if (state.gameType === "awale" && state.awale?.winnerSide !== undefined) {
-      if (state.awale.winnerSide === null) return null;
-      return state.players.find((player) => player.awaleSide === state.awale.winnerSide) ?? null;
-    }
-    const lastFinish = [...(state.log ?? [])].reverse().find((entry) => entry.type === "game_finished");
-    return state.players.find((player) => lastFinish?.message?.includes(`${player.name} remporte`)) ?? null;
-  }, [state]);
+  const defenseCards = React.useMemo(() => getDefenseCards(me), [me]);
+  const validDefenseCards = React.useMemo(() => getValidDefenseCards(defenseCards, pendingAttack), [defenseCards, pendingAttack]);
+  const invalidDefenseCards = React.useMemo(() => getInvalidDefenseCards(defenseCards, pendingAttack), [defenseCards, pendingAttack]);
+  const awaleRows = React.useMemo(() => getAwaleRows(state, me), [state, me]);
+  const gameWinner = React.useMemo(() => getGameWinner(state), [state]);
 
   React.useEffect(() => {
     if (!me) {
@@ -173,20 +97,16 @@ export function App() {
     return () => clearTimeout(timer);
   }, [state?.twentyOne?.lastRoundResult?.id, isTwentyOneGame]);
 
-  function ensureConnection() {
-    if (!socket.connected) socket.connect();
-  }
-
   function handleCreateRoom() {
     ensureConnection();
     setError("");
-    socket.emit("room:create", { playerName: name.trim() || "Joueur", gameType });
+    emit("room:create", { playerName: name.trim() || "Joueur", gameType });
   }
 
   function handleJoinRoom() {
     ensureConnection();
     setError("");
-    socket.emit("room:join", {
+    emit("room:join", {
       code: code.trim().toUpperCase(),
       playerName: name.trim() || "Joueur"
     });
@@ -195,7 +115,7 @@ export function App() {
   function handleSpectateRoom() {
     ensureConnection();
     setError("");
-    socket.emit("room:spectate", {
+    emit("room:spectate", {
       code: code.trim().toUpperCase(),
       spectatorName: name.trim() || "Spectateur"
     });
@@ -203,7 +123,7 @@ export function App() {
 
   function handleStartGame() {
     if (!state) return;
-    socket.emit("game:start", { code: state.code });
+    emit("game:start", { code: state.code });
   }
 
   async function copyRoomCode() {
@@ -220,57 +140,57 @@ export function App() {
   }
 
   function handleEndTurnFromSkipIcon() {
-    socket.emit("turn:end", { source: "skip_icon_button" });
+    emit("turn:end", { source: "skip_icon_button" });
   }
 
   function playCard(cardId, targetPlayerId) {
-    socket.emit("card:play", { cardId, targetPlayerId });
+    emit("card:play", { cardId, targetPlayerId });
     setActiveCardId(null);
   }
 
   function attack(attackType) {
-    socket.emit("combat:attack", { attackType, targetPlayerId: opponents[0]?.id });
+    emit("combat:attack", { attackType, targetPlayerId: opponents[0]?.id });
   }
 
   function drawCard() {
-    socket.emit("turn:draw");
+    emit("turn:draw");
   }
 
   function defend(defenseCardId) {
-    socket.emit("combat:defend", { defenseCardId });
+    emit("combat:defend", { defenseCardId });
   }
 
   function defendWithoutCard() {
-    socket.emit("combat:defend", {});
+    emit("combat:defend", {});
   }
 
   function playAwalePit(pitIndex) {
-    socket.emit("awale:move", { pitIndex });
+    emit("awale:move", { pitIndex });
   }
 
   function drawTwentyOneNumber() {
-    socket.emit("twentyone:draw-number");
+    emit("twentyone:draw-number");
   }
 
   function standTwentyOne() {
-    socket.emit("twentyone:stand");
+    emit("twentyone:stand");
   }
 
   function playTwentyOneTrump(cardId) {
-    socket.emit("twentyone:play-trump", { cardId });
+    emit("twentyone:play-trump", { cardId });
     setActiveCardId(null);
   }
 
   function abortCurrentGame() {
-    socket.emit("game:abort");
+    emit("game:abort");
   }
 
   function replayCurrentGame() {
-    socket.emit("game:replay");
+    emit("game:replay");
   }
 
   function returnToMenu() {
-    socket.disconnect();
+    disconnect();
     setState(null);
     setError("");
     setActiveCardId(null);
