@@ -1,9 +1,9 @@
 import React from "react";
-import { GAME_CHOICES } from "./gameChoices.js";
 import { styles } from "./styles.js";
-import { theme } from "./theme.js";
 import { AwaleDirectionRow, AwaleMiddleFlow, AwalePit } from "./awaleView.jsx";
-import { cardDetails, cardLabel, previewCardFromVision, soulsAttackCardTheme, soulsCardPalette, specialCardIcon, trumpShortEffect } from "./cardPresentation.js";
+import { CardDuelView } from "./CardDuelView.jsx";
+import { LobbyView } from "./LobbyView.jsx";
+import { cardDetails, cardLabel, soulsCardPalette, specialCardIcon, trumpShortEffect } from "./cardPresentation.js";
 import { getAwaleRows, getDefenseCards, getGameWinner, getInvalidDefenseCards, getIsSpectator, getMe, getOpponents, getSelectedTwentyOneTrump, getTwentyOneWinner, getValidDefenseCards, getVisibleDuelPlayers } from "./selectors.js";
 import { TwentyOneView } from "./TwentyOneView.jsx";
 import { useRoomSocket } from "./useRoomSocket.js";
@@ -39,7 +39,6 @@ export function App() {
   const isAwaleGame = state?.gameType === "awale";
   const isTwentyOneGame = state?.gameType === "twenty_one";
   const isHost = Boolean(state && me && state.hostPlayerId === me.id);
-  const selectedMode = GAME_CHOICES.find((choice) => choice.id === gameType) ?? GAME_CHOICES[0];
   const defenseCards = React.useMemo(() => getDefenseCards(me), [me]);
   const validDefenseCards = React.useMemo(() => getValidDefenseCards(defenseCards, pendingAttack), [defenseCards, pendingAttack]);
   const invalidDefenseCards = React.useMemo(() => getInvalidDefenseCards(defenseCards, pendingAttack), [defenseCards, pendingAttack]);
@@ -488,305 +487,26 @@ export function App() {
           width: "100%"
         }}
       >
-        {!state && (
-          <section className="souls-frame" style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 16 : styles.homeCard.padding }}>
-            <header style={styles.menuHeader}>
-              <h1 style={styles.menuTitle}>Salle de jeux</h1>
-            </header>
-
-            <section style={styles.menuSection}>
-              <div style={styles.menuSectionTitle}>Joueur</div>
-              <label className="menu-field" style={styles.menuRow}>
-                <span style={styles.menuLabel}>Nom du joueur</span>
-                <input
-                  className="menu-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Joueur"
-                  style={styles.menuInput}
-                />
-              </label>
-            </section>
-
-            <section style={styles.menuActions}>
-              <div style={styles.menuSectionTitle}>Actions</div>
-              <button
-                className="menu-row menu-action"
-                type="button"
-                onClick={() => setRoomAction("create")}
-                style={{
-                  ...styles.menuRow,
-                  ...styles.menuButtonRow,
-                  ...(roomAction === "create" ? styles.menuRowSelected : null)
-                }}
-              >
-                <span style={styles.menuLabel}>Créer une room</span>
-                <span style={styles.menuValue}>{roomAction === "create" ? "Sélectionné" : ""}</span>
-              </button>
-              <button
-                className="menu-row menu-action"
-                type="button"
-                onClick={() => setRoomAction("join")}
-                style={{
-                  ...styles.menuRow,
-                  ...styles.menuButtonRow,
-                  ...(roomAction === "join" ? styles.menuRowSelected : null)
-                }}
-              >
-                <span style={styles.menuLabel}>Rejoindre</span>
-                <span style={styles.menuValue}>{roomAction === "join" ? "Sélectionné" : ""}</span>
-              </button>
-              <button
-                className="menu-row menu-action"
-                type="button"
-                onClick={() => setRoomAction("spectate")}
-                style={{
-                  ...styles.menuRow,
-                  ...styles.menuButtonRow,
-                  ...(roomAction === "spectate" ? styles.menuRowSelected : null)
-                }}
-              >
-                <span style={styles.menuLabel}>Regarder</span>
-                <span style={styles.menuValue}>{roomAction === "spectate" ? "Sélectionné" : ""}</span>
-              </button>
-            </section>
-
-            {roomAction === "create" ? (
-              <section style={styles.menuSection}>
-                <div style={styles.menuSectionTitle}>Mode de jeu</div>
-                {GAME_CHOICES.map((choice) => {
-                  const isSelected = gameType === choice.id;
-                  return (
-                    <button
-                      key={choice.id}
-                      className="menu-row"
-                      type="button"
-                      onClick={() => setGameType(choice.id)}
-                      style={{
-                        ...styles.menuRow,
-                        ...styles.menuButtonRow,
-                        alignItems: isSelected ? "start" : styles.menuRow.alignItems,
-                        ...(isSelected ? styles.menuRowSelected : null)
-                      }}
-                    >
-                      <span style={{ ...styles.menuLabel, display: "grid", gap: 3 }}>
-                        <span>{choice.title}</span>
-                        {isSelected && <span style={styles.menuDescription}>{choice.desc}</span>}
-                      </span>
-                      <span style={styles.menuValue}>{isSelected ? "Sélectionné" : ""}</span>
-                    </button>
-                  );
-                })}
-              </section>
-            ) : (
-              <section style={styles.menuSection}>
-                <div style={styles.menuSectionTitle}>Connexion / room</div>
-                <label className="menu-field" style={styles.menuRow}>
-                  <span style={styles.menuLabel}>Code room</span>
-                  <input
-                    className="menu-input"
-                    value={code}
-                    placeholder="____"
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    style={styles.menuInput}
-                  />
-                </label>
-              </section>
-            )}
-
-            <button
-              className="menu-row menu-action"
-              type="button"
-              onClick={roomAction === "create" ? handleCreateRoom : roomAction === "spectate" ? handleSpectateRoom : handleJoinRoom}
-              style={{ ...styles.menuRow, ...styles.menuButtonRow, ...styles.validateButton }}
-            >
-              Valider
-            </button>
-
-            {/* Legacy menu removed from display after the action-first flow. */}
-            <section style={{ display: "none" }}>
-              <div style={styles.menuSectionTitle}>Mode de jeu</div>
-              {GAME_CHOICES.map((choice) => {
-                const isSelected = gameType === choice.id;
-                return (
-                  <button
-                    key={choice.id}
-                    className="menu-row"
-                    type="button"
-                    onClick={() => setGameType(choice.id)}
-                    style={{
-                      ...styles.menuRow,
-                      ...styles.menuButtonRow,
-                      ...(isSelected ? styles.menuRowSelected : null)
-                    }}
-                  >
-                    <span style={styles.menuLabel}>{choice.title}</span>
-                    <span style={styles.menuValue}>{isSelected ? "Sélectionné" : ""}</span>
-                  </button>
-                );
-              })}
-              <span style={styles.menuDescription}>{selectedMode.desc}</span>
-            </section>
-
-            <section style={{ display: "none" }}>
-              <div style={styles.menuSectionTitle}>Connexion / room</div>
-              <label className="menu-field" style={styles.menuRow}>
-                <span style={styles.menuLabel}>Code room</span>
-                <input
-                  className="menu-input"
-                  value={code}
-                  placeholder="____"
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  style={styles.menuInput}
-                />
-              </label>
-            </section>
-
-            <section style={{ display: "none" }}>
-              <div style={styles.menuSectionTitle}>Actions</div>
-              <button className="menu-row menu-action" type="button" onClick={handleCreateRoom} style={{ ...styles.menuRow, ...styles.menuButtonRow }}>
-                <span style={styles.menuLabel}>Créer une room</span>
-                <span style={styles.menuValue}>{selectedMode.title}</span>
-              </button>
-              <button className="menu-row menu-action" type="button" onClick={handleJoinRoom} style={{ ...styles.menuRow, ...styles.menuButtonRow }}>
-                <span style={styles.menuLabel}>Rejoindre</span>
-                <span style={styles.menuValue}>{code || "Code requis"}</span>
-              </button>
-              <div style={styles.menuActionHint}>
-                <span>Entrer: valider la ligne active</span>
-                <span>Sélection: orange-brun</span>
-              </div>
-            </section>
-            <div style={{ display: "none" }}>
-            <strong style={{ fontSize: 20 }}>Salle de jeux</strong>
-            <span>Crée une room ou rejoins une room existante, puis joue au duel de cartes ou à l'Awalé.</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pseudo" />
-            <div style={styles.gameChoice}>
-              {[
-                { id: "card_duel", title: "Duel de cartes", desc: "Le combat temps réel existant." },
-                { id: "awale", title: "Awalé classique", desc: "12 trous, 48 graines, captures par 2 ou 3." },
-                { id: "twenty_one", title: "Twenty One", desc: "Approche la cible, joue des cartes spéciales, protège tes 3 vies." }
-              ].map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  onClick={() => setGameType(choice.id)}
-                  style={{
-                    ...styles.gameChoiceButton,
-                    border: gameType === choice.id ? "1px solid rgba(240, 138, 53, 0.86)" : styles.gameChoiceButton.border,
-                    boxShadow: gameType === choice.id ? `0 0 0 2px rgba(240, 138, 53, 0.18), inset 0 0 28px ${theme.glow}` : "none"
-                  }}
-                >
-                  <strong>{choice.title}</strong>
-                  <span style={styles.small}>{choice.desc}</span>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>
-              <button style={{ flex: isMobilePortrait ? "1 1 100%" : undefined }} onClick={handleCreateRoom}>Créer une room {gameType === "awale" ? "Awalé" : gameType === "twenty_one" ? "Twenty One" : "Duel"}</button>
-              <input
-                value={code}
-                placeholder="Code room"
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                style={{ flex: isMobilePortrait ? "1 1 54%" : undefined }}
-              />
-              <button style={{ flex: isMobilePortrait ? "1 1 38%" : undefined }} onClick={handleJoinRoom}>Rejoindre</button>
-            </div>
-            </div>
-          </section>
-        )}
-
-        {state && isLobbyPhase && (
-          <section className="souls-frame" style={{ ...styles.homeCard, borderRadius: isMobilePortrait ? 0 : styles.homeCard.borderRadius, padding: isMobilePortrait ? 16 : styles.homeCard.padding }}>
-            <header style={styles.menuHeader}>
-              <h1 style={styles.menuTitle}>Lobby</h1>
-              <span style={styles.menuSubtitle}>
-                Room {state.code}. {state.gameType === "awale" ? "Awalé classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"}. En attente des joueurs.
-              </span>
-            </header>
-
-            <section style={styles.menuSection}>
-              <div style={styles.menuSectionTitle}>Code room</div>
-              <button
-                className="menu-row menu-action"
-                type="button"
-                onClick={copyRoomCode}
-                style={{ ...styles.menuRow, ...styles.menuButtonRow }}
-                title="Copier le code de la room"
-              >
-                <span style={styles.menuLabel}>{state.code}</span>
-                <span style={styles.menuValue}>{copyFeedback || "Copier"}</span>
-              </button>
-            </section>
-
-            <section style={styles.menuSection}>
-              <div style={styles.menuSectionTitle}>Joueurs</div>
-              {state.players.map((player) => (
-                <div
-                  key={player.id}
-                  className="menu-row"
-                  style={{
-                    ...styles.menuRow,
-                    ...(player.id === state.hostPlayerId ? styles.menuRowSelected : null)
-                  }}
-                >
-                  <span style={styles.menuLabel}>{player.name}</span>
-                  <span style={styles.menuValue}>{player.id === state.hostPlayerId ? "Hôte" : "Invité"}</span>
-                </div>
-              ))}
-              {state.players.length < 2 && (
-                <div className="menu-row" style={{ ...styles.menuRow, color: "rgba(216, 201, 167, 0.48)" }}>
-                  <span style={styles.menuLabel}>Emplacement libre</span>
-                  <span style={styles.menuValue}>En attente</span>
-                </div>
-              )}
-            </section>
-
-            <section style={styles.menuActions}>
-              <div style={styles.menuSectionTitle}>Actions</div>
-              {isHost ? (
-                <button
-                  className="menu-row menu-action"
-                  type="button"
-                  onClick={handleStartGame}
-                  disabled={state.players.length < 2}
-                  style={{ ...styles.menuRow, ...styles.menuButtonRow }}
-                >
-                  <span style={styles.menuLabel}>Démarrer</span>
-                  <span style={styles.menuValue}>{state.players.length < 2 ? "Deux joueurs requis" : "Prêt"}</span>
-                </button>
-              ) : (
-                <div className="menu-row" style={{ ...styles.menuRow, color: "rgba(216, 201, 167, 0.58)" }}>
-                  <span style={styles.menuLabel}>Démarrer</span>
-                  <span style={styles.menuValue}>Réservé à l'hôte</span>
-                </div>
-              )}
-            </section>
-            <div style={{ display: "none" }}>
-            <strong style={{ fontSize: 20 }}>Lobby</strong>
-            <p style={{ margin: 0 }}>
-              Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"} · En attente des joueurs.
-            </p>
-            <ul style={styles.lobbyPlayers}>
-              {state.players.map((player) => (
-                <li key={player.id} style={styles.lobbyPlayerItem}>
-                  {player.name} {player.id === state.hostPlayerId ? "(hôte)" : ""}
-                </li>
-              ))}
-            </ul>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {isHost ? (
-                <button onClick={handleStartGame} disabled={state.players.length < 2}>
-                  Démarrer
-                </button>
-              ) : (
-                <span>Seul l'hôte peut lancer la partie.</span>
-              )}
-              {state.players.length < 2 && <span>Il faut 2 joueurs pour démarrer.</span>}
-            </div>
-            </div>
-          </section>
-        )}
+        <LobbyView
+          state={state}
+          isLobbyPhase={isLobbyPhase}
+          isMobilePortrait={isMobilePortrait}
+          name={name}
+          setName={setName}
+          code={code}
+          setCode={setCode}
+          gameType={gameType}
+          setGameType={setGameType}
+          roomAction={roomAction}
+          setRoomAction={setRoomAction}
+          copyFeedback={copyFeedback}
+          isHost={isHost}
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          onSpectateRoom={handleSpectateRoom}
+          onCopyRoomCode={copyRoomCode}
+          onStartGame={handleStartGame}
+        />
 
         {state && !isLobbyPhase && isAwaleGame && (
           <section style={{ display: "grid", gap: isMobilePortrait ? 8 : 10, width: "100%" }}>
@@ -944,223 +664,23 @@ export function App() {
           />
         )}
 
-        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
-          <section
-            style={{
-              ...styles.board,
-              minHeight: isMobilePortrait ? "calc(100dvh - 210px)" : isMobile ? 380 : styles.board.minHeight,
-              borderRadius: isMobilePortrait ? 14 : styles.board.borderRadius,
-              padding: isMobilePortrait ? 6 : isMobile ? 10 : styles.board.padding,
-              gap: isMobilePortrait ? 8 : styles.board.gap
-            }}
-          >
-            <div>
-              {isSpectator ? (
-                <div style={{ display: "grid", gap: 12 }}>
-                  {visibleDuelPlayers.map((player) => (
-                    <div key={player.id}>
-                      <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
-                        {player.name} · HP {player.hp} · Énergie {player.energy}/{state.config.maxEnergy} · {player.handCount} cartes
-                      </div>
-                      <div style={styles.opponentHand}>
-                        {Array.from({ length: player.handCount }).map((_, index) => (
-                          <div key={`${player.id}-spectator-card-${index}`} style={styles.cardBack}>UNO</div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : opponents[0] ? (
-                <>
-                  <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
-                    {opponents[0].name} · HP {opponents[0].hp} · Énergie {opponents[0].energy}/{state.config.maxEnergy} · {opponents[0].handCount} cartes
-                  </div>
-                  <div style={styles.opponentHand}>
-                    {Array.from({ length: opponents[0].handCount }).map((_, index) => (
-                      (() => {
-                        const revealedCard = previewCardFromVision(state.opponentHandPreview?.[index]);
-                        const palette = revealedCard ? soulsCardPalette(revealedCard) : null;
-                        return (
-                          <div
-                            key={`opponent-card-${index}`}
-                            style={
-                              revealedCard
-                                ? {
-                                    ...styles.cardBack,
-                                    width: isMobile ? 58 : 64,
-                                    height: isMobile ? 84 : 90,
-                                    background: palette.bg,
-                                    flexDirection: "column",
-                                    gap: 3,
-                                    fontSize: 11
-                                  }
-                                : styles.cardBack
-                            }
-                          >
-                            {revealedCard ? (
-                              <>
-                                <span style={{ fontSize: 20, lineHeight: 1 }}>{palette.icon}</span>
-                                <span style={{ fontSize: 9, textAlign: "center", padding: "0 3px" }}>
-                                  {cardLabel(revealedCard)}
-                                </span>
-                              </>
-                            ) : (
-                              "UNO"
-                            )}
-                          </div>
-                        );
-                      })()
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize }}>En attente d'un adversaire...</div>
-              )}
-            </div>
-
-            <div style={styles.centerArena}>
-              <div
-                style={{
-                  ...styles.centerPanel,
-                  width: "100%",
-                  minHeight: isMobilePortrait ? 106 : isMobile ? 126 : styles.centerPanel.minHeight,
-                  borderRadius: isMobilePortrait ? 16 : styles.centerPanel.borderRadius,
-                  gap: isMobilePortrait ? 6 : isMobile ? 8 : styles.centerPanel.gap,
-                  padding: isMobilePortrait ? 8 : styles.centerPanel.padding,
-                  flexWrap: "wrap"
-                }}
-              >
-                <div style={styles.deckActions}>
-                  <button
-                    type="button"
-                    onClick={drawCard}
-                    disabled={!isMyTurn || Boolean(pendingAttack)}
-                    style={{
-                      ...styles.drawDeckButton,
-                      width: isMobilePortrait ? 104 : isMobile ? 98 : styles.drawDeckButton.width,
-                      minHeight: isMobilePortrait ? 116 : isMobile ? 124 : styles.drawDeckButton.minHeight,
-                      opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
-                    }}
-                    title="Clique pour piocher une carte utilitaire/défense (1 énergie)."
-                  >
-                    <div style={styles.actionIcon}>🂠</div>
-                    <div style={{ fontSize: 13 }}>Pioche</div>
-                    <div style={{ fontSize: 11, opacity: 0.9 }}>1 énergie</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleEndTurnFromSkipIcon}
-                    disabled={!isMyTurn || Boolean(pendingAttack)}
-                    style={{
-                      ...styles.skipTurnButton,
-                      opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
-                    }}
-                    title="Passer le tour"
-                  >
-                    <span style={{ transform: "translateX(0.5px)" }}>⏭</span>
-                  </button>
-                </div>
-                {pendingAttack && (
-                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 150 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 76 : isMobile ? 86 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
-                    <span style={styles.arenaSlotLabel}>Defense en attente</span>
-                    <strong>{pendingAttack.card.label}</strong>
-                    <span style={styles.arenaSlotMeta}>
-                      cible: {isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "adversaire"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {me && (
-              <div>
-                <div style={{ ...styles.playerBadge, maxWidth: "100%", flexWrap: "wrap", fontSize: isMobilePortrait ? 12 : styles.playerBadge.fontSize, padding: isMobilePortrait ? "6px 10px" : styles.playerBadge.padding }}>
-                  {me.name} · HP {me.hp} · Énergie {me.energy}/{state.config.maxEnergy}
-                </div>
-                <div style={{ ...styles.handRow, minHeight: isMobilePortrait ? 132 : isMobile ? 124 : styles.handRow.minHeight, gap: isMobilePortrait ? 5 : isMobile ? 6 : styles.handRow.gap, padding: isMobilePortrait ? "8px 0" : styles.handRow.padding }}>
-                  {me.hand.map((card, index) => {
-                    const palette = soulsCardPalette(card);
-                    const isActive = activeCardId === card.id;
-                    const tilt = (index - (me.hand.length - 1) / 2) * 5;
-                    return (
-                      <button
-                        key={card.id}
-                        type="button"
-                        style={{
-                          ...styles.cardButton,
-                          width: isMobilePortrait ? "clamp(104px, 31vw, 118px)" : isMobile ? 96 : styles.cardButton.width,
-                          minHeight: isMobilePortrait ? 136 : isMobile ? 124 : styles.cardButton.minHeight,
-                          background: palette.bg,
-                          transform: isActive
-                            ? "translateY(-18px) scale(1.05)"
-                            : `rotate(${tilt}deg) translateY(0px)`,
-                          boxShadow: isActive
-                            ? "0 18px 22px rgba(16, 24, 46, 0.44)"
-                            : styles.cardButton.boxShadow,
-                          filter: isActive ? "saturate(1.2)" : "none",
-                          opacity:
-                            card.type === "utility" && (!isMyTurn || Boolean(pendingAttack)) && !isActive
-                              ? 0.75
-                              : 1
-                        }}
-                        onClick={() => handleCardClick(card)}
-                        title={
-                          card.type === "utility"
-                            ? "Clique une fois pour sélectionner, re-clique pour jouer."
-                            : "Carte défensive utilisée automatiquement via popup en défense."
-                        }
-                      >
-                        <div style={styles.cardHeader}>
-                          <span>{card.type === "defense" ? "DEF" : "UTIL"}</span>
-                          <span>{palette.icon}</span>
-                        </div>
-                        <div style={{ ...styles.cardMain, fontSize: isMobilePortrait ? 30 : styles.cardMain.fontSize }}>{palette.icon}</div>
-                        <div style={styles.cardSub}>{cardLabel(card)}</div>
-                        <div style={styles.small}>{cardDetails(card)}</div>
-                        {isActive && card.type === "utility" && isMyTurn && !pendingAttack && (
-                          <div style={{ fontSize: 11, marginTop: 2, fontWeight: 700 }}>
-                            Re-clique pour jouer
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
-          <section style={{ ...styles.controls, marginTop: isMobilePortrait ? 8 : styles.controls.marginTop, padding: isMobilePortrait ? 8 : styles.controls.padding, borderRadius: isMobilePortrait ? 12 : styles.controls.borderRadius }}>
-            <div>
-              <strong>Actions de tour</strong>
-              <div style={{ ...styles.actionCards, gridTemplateColumns: isMobilePortrait ? "repeat(3, minmax(0, 1fr))" : isMobile ? "repeat(2, minmax(0, 1fr))" : styles.actionCards.gridTemplateColumns, gap: isMobilePortrait ? 6 : styles.actionCards.gap }}>
-                {["ranged", "magic", "melee"].map((attackType) => {
-                  const theme = soulsAttackCardTheme(attackType);
-                  return (
-                    <button
-                      key={attackType}
-                      onClick={() => attack(attackType)}
-                      disabled={!isMyTurn || Boolean(pendingAttack)}
-                      style={{
-                        ...styles.actionCardButton,
-                        background: theme.bg,
-                        minHeight: isMobilePortrait ? 86 : isMobile ? 94 : styles.actionCardButton.minHeight,
-                        padding: isMobilePortrait ? 7 : styles.actionCardButton.padding,
-                        opacity: !isMyTurn || Boolean(pendingAttack) ? 0.6 : 1
-                      }}
-                    >
-                      <div style={styles.actionIcon}>{theme.icon}</div>
-                      <div style={styles.actionTitle}>Attaque {theme.title}</div>
-                      <div style={styles.actionSubtitle}>{theme.die}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        )}
+        <CardDuelView
+          state={state}
+          me={me}
+          opponents={opponents}
+          visibleDuelPlayers={visibleDuelPlayers}
+          isMobile={isMobile}
+          isMobilePortrait={isMobilePortrait}
+          isSpectator={isSpectator}
+          isMyTurn={isMyTurn}
+          isMyDefenseTurn={isMyDefenseTurn}
+          pendingAttack={pendingAttack}
+          activeCardId={activeCardId}
+          onDrawCard={drawCard}
+          onEndTurn={handleEndTurnFromSkipIcon}
+          onCardClick={handleCardClick}
+          onAttack={attack}
+        />
 
         {state && !isLobbyPhase && isAwaleGame && (
           <section style={{ ...styles.log, marginTop: isMobilePortrait ? 8 : styles.log.marginTop, maxHeight: isMobilePortrait ? 130 : styles.log.maxHeight, fontSize: isMobilePortrait ? 12 : styles.log.fontSize }}>
