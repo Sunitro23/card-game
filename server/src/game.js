@@ -28,7 +28,6 @@ export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
     hostPlayerId: host.id,
     log: [{ at: Date.now(), type: "room_created", message: `${hostName} a crÃ©Ã© la partie ${code}.` }],
     pendingAttack: null,
-    cardDuel: null,
     awale: null,
     twentyOne: null
   };
@@ -92,7 +91,6 @@ export function replayGame(code, requesterPlayerId) {
 
   room.turnIndex = Math.floor(Math.random() * room.players.length);
   room.pendingAttack = null;
-  room.cardDuel = null;
   room.awale = null;
   room.twentyOne = null;
   room.log.push({ at: Date.now(), type: "game_replay", message: "Nouvelle partie lancée." });
@@ -161,11 +159,6 @@ export function getVisibleState(room, playerId) {
     hostPlayerId: room.hostPlayerId,
     viewerRole,
     spectatorCount: room.spectators?.length ?? 0,
-    cardDuel: room.cardDuel
-      ? {
-          lastEvent: room.cardDuel.lastEvent
-        }
-      : null,
     players: room.players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -185,7 +178,7 @@ export function getVisibleState(room, playerId) {
             manualStand: Boolean(p.twentyOne.manualStand),
             autoBust: p.twentyOne.autoBust,
             bless: p.twentyOne.bless,
-            hasPlayedCardThisRound: p.twentyOne.hasPlayedCardThisRound,
+            hasDrawnThisTurn: Boolean(p.twentyOne.hasDrawnThisTurn),
             cards: p.twentyOne.cards.map((card) => ({
               id: card.id,
               value: p.id === playerId || !card.hidden ? card.value : null,

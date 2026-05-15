@@ -18,7 +18,7 @@ export function App() {
   const [copyFeedback, setCopyFeedback] = React.useState("");
   const [showAwaleRules, setShowAwaleRules] = React.useState(false);
   const [showTwentyOneRules, setShowTwentyOneRules] = React.useState(false);
-  const [duelResultPopup, setDuelResultPopup] = React.useState(null);
+  const [defenseToast, setDefenseToast] = React.useState("");
   const [trumpPopup, setTrumpPopup] = React.useState(null);
   const [twentyOneResultToast, setTwentyOneResultToast] = React.useState(null);
   const getViewportState = React.useCallback(() => ({
@@ -133,13 +133,15 @@ export function App() {
   }, [me, activeCardId]);
 
   React.useEffect(() => {
-    const event = state?.cardDuel?.lastEvent;
-    if (!event?.id || state?.gameType !== "card_duel") return;
+    const lastLog = state?.log?.[state.log.length - 1];
+    if (!lastLog) return;
 
-    setDuelResultPopup(event);
-    const timer = setTimeout(() => setDuelResultPopup(null), 3200);
-    return () => clearTimeout(timer);
-  }, [state?.cardDuel?.lastEvent?.id, state?.gameType]);
+    if (["counter", "counter_fail", "attack_resolved"].includes(lastLog.type)) {
+      setDefenseToast(lastLog.message);
+      const timer = setTimeout(() => setDefenseToast(""), 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [state?.log]);
 
   React.useEffect(() => {
     const lastLog = state?.log?.[state.log.length - 1];
@@ -288,58 +290,6 @@ export function App() {
 
     setActiveCardId(card.id);
   }
-
-  function duelResultCopy(event) {
-    if (!event) return null;
-    const defender = event.defenderId === me?.id ? "Tu" : event.defenderName;
-    const attacker = event.attackerId === me?.id ? "Tu" : event.attackerName;
-
-    if (event.type === "dodge") {
-      return {
-        label: "Esquive",
-        title: `${defender} esquive l'attaque`,
-        detail: "Aucun degat subi.",
-        meta: `${event.attackLabel} evitee`,
-        icon: "↺"
-      };
-    }
-    if (event.type === "block") {
-      return {
-        label: "Blocage",
-        title: `${defender} bloque`,
-        detail: event.damage > 0 ? `${event.damage} degat(s) passent.` : "Tout est absorbe.",
-        meta: `${event.attackLabel} reduite`,
-        icon: "▣"
-      };
-    }
-    if (event.type === "counter_melee" || event.type === "counter_magic") {
-      return {
-        label: "Contre reussi",
-        title: `${defender} contre`,
-        detail: `${event.reflectedDamage} degat(s) renvoyes a ${attacker}.`,
-        meta: "L'attaque est annulee",
-        icon: "⚔"
-      };
-    }
-    if (event.type === "counter_fail") {
-      return {
-        label: "Contre rate",
-        title: `${defender} rate son contre`,
-        detail: `${event.damage} degat(s) subis.`,
-        meta: `${event.attackLabel} touche`,
-        icon: "!"
-      };
-    }
-    return {
-      label: "Impact",
-      title: `${attacker} touche ${defender}`,
-      detail: `${event.damage} degat(s) subis.`,
-      meta: "Aucune defense jouee",
-      icon: "✦"
-    };
-  }
-
-  const duelResult = duelResultCopy(duelResultPopup);
 
   return (
     <main style={{ ...styles.page, padding: isMobilePortrait ? 0 : isMobile ? 6 : isMobileLandscape ? 4 : styles.page.padding }}>
@@ -1046,12 +996,12 @@ export function App() {
             {showTwentyOneRules && (
               <section style={{ ...styles.ruleBox, borderColor: "rgba(216, 201, 167, 0.16)", background: "rgba(10, 9, 7, 0.7)", fontSize: isMobile ? 12 : styles.ruleBox.fontSize, padding: isMobile ? 8 : styles.ruleBox.padding }}>
                 <strong>Règles Twenty One</strong>
-                <span>Chaque manche vise la cible active. Les Go For peuvent la changer en 17, 24 ou 27.</span>
+                <span>Chaque manche vise la cible active. Les cartes Cible 17, 24 ou 27 peuvent la changer.</span>
                 <span>L'As vaut 1 ou 11 selon le meilleur total possible.</span>
-                <span>Chaque joueur commence avec 2 cartes cachees. Le paquet numerique contient une seule carte de chaque rang.</span>
-                <span>Le joueur actif peut piocher autant qu'il veut, puis cliquer Rester pour passer la main.</span>
-                <span>Si les deux joueurs restent sans jouer de carte pendant la manche, elle se termine sans perte de vie.</span>
-                <span>Le perdant perd la mise en vies; Bless peut empêcher une mort.</span>
+                <span>Chaque joueur commence avec 1 carte cachée et 1 carte visible. Le paquet de points contient une seule carte de chaque rang.</span>
+                <span>La manche se résout uniquement quand les 2 joueurs cliquent Rester à la suite.</span>
+                <span>Piocher passe le tour, mais remet cette chaîne de Rester à zéro.</span>
+                <span>Le perdant perd la mise en vies; Grâce peut empêcher une mort.</span>
                 <span>Les cartes spéciales gardées restent en main. +3 cartes spéciales par manche, jusqu'à 6 en main.</span>
               </section>
             )}
@@ -1063,7 +1013,7 @@ export function App() {
                 padding: isMobile ? "7px 8px" : styles.awaleTurnHint.padding
               }}
             >
-              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "A toi de jouer : pioche autant que tu veux, puis clique Rester." : state.phase === "finished" ? "Partie terminee." : "Tour adverse."}
+              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "À toi de jouer : pioche 1 fois pour passer, joue une carte spéciale ou clique Rester." : state.phase === "finished" ? "Partie terminée." : "Tour adverse."}
             </div>
 
             <div
@@ -1080,7 +1030,7 @@ export function App() {
                   const target = state.twentyOne?.target ?? 21;
                   const busted = total > target;
                   const playerStatus = player.twentyOne?.stood ? "Reste" : player.id === state.turnPlayerId && state.phase !== "finished" ? "Tour actif" : busted ? "Bust" : "";
-                  const playerNote = [playerStatus, player.twentyOne?.bless ? "Bless" : ""].filter(Boolean).join(" · ");
+                  const playerNote = [playerStatus, player.twentyOne?.bless ? "Grâce" : ""].filter(Boolean).join(" · ");
                   return (
                     <div key={player.id} style={{ ...styles.twentyOnePlayerPanel, borderTop: isSelf ? 0 : styles.twentyOnePlayerPanel.borderTop, padding: isMobile ? "4px 0" : styles.twentyOnePlayerPanel.padding }}>
                       <div
@@ -1149,19 +1099,19 @@ export function App() {
                     <button
                       className="twenty-one-action"
                       onClick={drawTwentyOneNumber}
-                      disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
+                      disabled={!isMyTurn || me?.twentyOne?.stood || me?.twentyOne?.hasDrawnThisTurn || state.phase === "finished"}
                       style={{
                         ...styles.twentyOneDrawAction,
                         minHeight: isMobile ? 54 : styles.twentyOneDrawAction.minHeight,
                         gridTemplateColumns: isMobile ? "28px 1fr" : styles.twentyOneDrawAction.gridTemplateColumns,
                         padding: isMobile ? "6px 8px" : undefined,
-                        opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1
+                        opacity: !isMyTurn || me?.twentyOne?.stood || me?.twentyOne?.hasDrawnThisTurn || state.phase === "finished" ? 0.6 : 1
                       }}
                     >
                       <span style={{ fontSize: isMobile ? 21 : 28, lineHeight: 1 }}>🂡</span>
                       <span>
                         <span style={{ display: "block", fontSize: isMobile ? 14 : 17 }}>Piocher</span>
-                        <span style={{ display: "block", fontSize: isMobile ? 10 : 12, color: "rgba(255,240,201,0.72)" }}>Carte</span>
+                        <span style={{ display: "block", fontSize: isMobile ? 10 : 12, color: "rgba(255,240,201,0.72)" }}>1 fois puis passe</span>
                       </span>
                     </button>
                     <button
@@ -1182,14 +1132,31 @@ export function App() {
                 </div>
               </div>
 
-              {me && (
-                <aside style={{ ...styles.twentyOneTrumpPanel, padding: isMobile ? 8 : styles.twentyOneTrumpPanel.padding, gap: isMobile ? 8 : styles.twentyOneTrumpPanel.gap }}>
-                  <div style={{ display: "grid", gap: 2 }}>
-                    <strong>Cartes spéciales</strong>
-                    {!isMobile && <span style={{ color: "rgba(232, 216, 181, 0.56)", fontSize: 12 }}>+3 par manche, 6 en main maximum.</span>}
+              <aside style={{ ...styles.twentyOneTrumpPanel, padding: isMobile ? 8 : styles.twentyOneTrumpPanel.padding, gap: isMobile ? 8 : styles.twentyOneTrumpPanel.gap }}>
+                  <div style={styles.twentyOneSideStats}>
+                    <div style={styles.twentyOneSideStat}>
+                      <span style={styles.twentyOneStatLabel}>Mise</span>
+                      <strong style={{ ...styles.twentyOneSideStatValue, fontSize: isMobile ? 28 : styles.twentyOneSideStatValue.fontSize }}>
+                        {state.twentyOne?.bet ?? 0}
+                      </strong>
+                      <span style={styles.twentyOneSideStatHint}>vie(s) en jeu</span>
+                    </div>
+                    <div style={styles.twentyOneSideStat}>
+                      <span style={styles.twentyOneStatLabel}>Cible</span>
+                      <strong style={{ ...styles.twentyOneSideStatValue, fontSize: isMobile ? 28 : styles.twentyOneSideStatValue.fontSize }}>
+                        {state.twentyOne?.target ?? 21}
+                      </strong>
+                      <span style={styles.twentyOneSideStatHint}>à approcher</span>
+                    </div>
                   </div>
-                  <div style={{ ...styles.twentyOneTrumpHand, gap: isMobile ? 4 : styles.twentyOneTrumpHand.gap }}>
-                    {me.hand.map((card) => {
+                  {me ? (
+                    <>
+                      <div style={{ display: "grid", gap: 2 }}>
+                        <strong>Cartes spéciales</strong>
+                        {!isMobile && <span style={{ color: "rgba(232, 216, 181, 0.56)", fontSize: 12 }}>+3 par manche, 6 en main maximum.</span>}
+                      </div>
+                      <div style={{ ...styles.twentyOneTrumpHand, gap: isMobile ? 4 : styles.twentyOneTrumpHand.gap }}>
+                        {me.hand.map((card) => {
                       const palette = soulsCardPalette(card);
                       const isActive = selectedTwentyOneTrump?.id === card.id;
                       const isBustStand = me?.twentyOne?.autoBust || ((me?.twentyOne?.total ?? 0) > (state.twentyOne?.target ?? 21));
@@ -1222,10 +1189,13 @@ export function App() {
                           <span style={{ ...styles.twentyOneTrumpIcon, fontSize: isMobile ? 36 : styles.twentyOneTrumpIcon.fontSize }}>{palette.icon}</span>
                         </button>
                       );
-                    })}
-                  </div>
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <span style={styles.twentyOneSideStatHint}>Mode spectateur : la mise reste visible pendant toute la manche.</span>
+                  )}
                 </aside>
-              )}
             </div>
 
             {state.phase === "finished" && (
@@ -1351,12 +1321,8 @@ export function App() {
                   </button>
                 </div>
                 {pendingAttack && (
-                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 150 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 76 : isMobile ? 86 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
-                    <span style={styles.arenaSlotLabel}>Defense en attente</span>
-                    <strong>{pendingAttack.card.label}</strong>
-                    <span style={styles.arenaSlotMeta}>
-                      cible: {isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "adversaire"}
-                    </span>
+                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 66 : isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
+                    {`${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}`}
                   </div>
                 )}
               </div>
@@ -1452,7 +1418,7 @@ export function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && isAwaleGame && (
+        {state && !isLobbyPhase && !isTwentyOneGame && (
           <section style={{ ...styles.log, marginTop: isMobilePortrait ? 8 : styles.log.marginTop, maxHeight: isMobilePortrait ? 130 : styles.log.maxHeight, fontSize: isMobilePortrait ? 12 : styles.log.fontSize }}>
             <strong>Journal</strong>
             <ul>
@@ -1559,39 +1525,8 @@ export function App() {
           </div>
         )}
 
-        {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && duelResult && (
-          <div
-            key={duelResultPopup.id}
-            className={`twenty-one-winner-toast duel-result-popup${duelResultPopup.type === "counter_fail" ? " is-tie" : ""}`}
-            style={styles.duelResultPopup}
-          >
-            <span style={styles.twentyOneWinnerSparks} aria-hidden="true">
-              {[
-                [-112, -28],
-                [-72, 42],
-                [-24, -58],
-                [32, 58],
-                [76, -36],
-                [112, 22]
-              ].map(([x, y], index) => (
-                <span
-                  key={`${duelResultPopup.id}-${index}`}
-                  className="twenty-one-result-spark"
-                  style={{
-                    "--spark-x": `${x}px`,
-                    "--spark-y": `${y}px`,
-                    "--spark-delay": `${index * 70}ms`
-                  }}
-                />
-              ))}
-            </span>
-            <span style={styles.twentyOneWinnerLabel}>{duelResult.label}</span>
-            <strong style={styles.duelResultTitle}>
-              <span aria-hidden="true">{duelResult.icon}</span> {duelResult.title}
-            </strong>
-            <span style={styles.twentyOneWinnerMeta}>{duelResult.detail}</span>
-            <span style={styles.duelResultMeta}>{duelResult.meta}</span>
-          </div>
+        {defenseToast && (
+          <div style={styles.defenseToast}>{defenseToast}</div>
         )}
 
         {trumpPopup && (
@@ -1600,6 +1535,7 @@ export function App() {
               <div style={{ fontSize: 42, lineHeight: 1 }}>{specialCardIcon(trumpPopup.card ?? { type: "trump" })}</div>
               <h3 style={{ margin: "6px 0" }}>Carte spéciale jouée</h3>
               <strong style={{ fontSize: 22 }}>{trumpPopup.card?.name ?? "Carte spéciale"}</strong>
+              <p style={{ margin: "8px 0 0", fontWeight: 700 }}>{cardDetails(trumpPopup.card ?? { type: "trump" })}</p>
               <p style={{ marginBottom: 0 }}>{trumpPopup.message}</p>
             </div>
           </div>
