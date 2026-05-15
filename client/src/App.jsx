@@ -1310,6 +1310,7 @@ export function App() {
               <div style={{ fontSize: 42, lineHeight: 1 }}>{specialCardIcon(trumpPopup.card ?? { type: "trump" })}</div>
               <h3 style={{ margin: "6px 0" }}>Carte spéciale jouée</h3>
               <strong style={{ fontSize: 22 }}>{trumpPopup.card?.name ?? "Carte spéciale"}</strong>
+              <p style={{ margin: "8px 0 0", fontWeight: 700 }}>{cardDetails(trumpPopup.card ?? { type: "trump" })}</p>
               <p style={{ marginBottom: 0 }}>{trumpPopup.message}</p>
             </div>
           </div>

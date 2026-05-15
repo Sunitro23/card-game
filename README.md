@@ -52,7 +52,7 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - `combat:defend` `{ code, attackId, defenseCardId? }`
 - `awale:move` `{ pitIndex }`
 - `twentyone:draw-number`
-- `twentyone:draw-trump`
+- `twentyone:draw-trump` (événement historique côté API; la pioche manuelle des cartes spéciales est refusée)
 - `twentyone:play-trump` `{ cardId }`
 - `twentyone:stand`
 - `game:abort`
