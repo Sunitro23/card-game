@@ -4,12 +4,14 @@ import { normalizeGameType } from "./core/gameTypes.js";
 import { getOpponent, makePlayer } from "./core/players.js";
 import { playersBySocketId, rooms } from "./core/state.js";
 import { finishAwale, getLegalAwaleMoves, getPlayerSide, playAwaleMove, startAwaleGame } from "./games/awale.js";
+import { shootBerenikeShot, startBerenikeShotGame, useBerenikeItem, visibleBerenikePlayer, visibleBerenikeState } from "./games/berenikeShot.js";
 import { drawCard, endTurn, mulligan, performAttack, playCard, resolveDefense, startCardDuelGame } from "./games/cardDuel.js";
 import { abortTwentyOneGame, drawTwentyOneNumberCard, drawTwentyOneTrumpCard, playTwentyOneTrump, standTwentyOne, startTwentyOneGame, twentyOneTotalForTarget } from "./games/twentyOne.js";
 
 export { playersBySocketId, rooms } from "./core/state.js";
 export { drawCard, endTurn, mulligan, performAttack, playCard, resolveDefense } from "./games/cardDuel.js";
 export { playAwaleMove } from "./games/awale.js";
+export { shootBerenikeShot, useBerenikeItem } from "./games/berenikeShot.js";
 export { drawTwentyOneNumberCard, drawTwentyOneTrumpCard, playTwentyOneTrump, standTwentyOne } from "./games/twentyOne.js";
 
 export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
@@ -26,9 +28,10 @@ export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
     players: [host],
     spectators: [],
     hostPlayerId: host.id,
-    log: [{ at: Date.now(), type: "room_created", message: `${hostName} a crÃ©Ã© la partie ${code}.` }],
+    log: [{ at: Date.now(), type: "room_created", message: `${hostName} a créé la partie ${code}.` }],
     pendingAttack: null,
     awale: null,
+    berenike: null,
     twentyOne: null
   };
 
@@ -40,10 +43,12 @@ export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
 export function joinRoom(code, socketId, playerName) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.phase !== "lobby") throw new Error("Partie dÃ©jÃ  dÃ©marrÃ©e.");
-  if (room.players.length >= 2) throw new Error("La room est pleine.");
+  if (room.phase !== "lobby") throw new Error("Partie déjà démarrée.");
 
-  const player = makePlayer(socketId, playerName, 2);
+  const maxPlayers = room.gameType === "berenike_shot" ? 8 : 2;
+  if (room.players.length >= maxPlayers) throw new Error("La room est pleine.");
+
+  const player = makePlayer(socketId, playerName, room.players.length);
   room.players.push(player);
   playersBySocketId.set(socketId, { code, playerId: player.id });
   room.log.push({ at: Date.now(), type: "player_joined", message: `${playerName} a rejoint.` });
@@ -68,17 +73,26 @@ export function spectateRoom(code, socketId, spectatorName) {
   return room;
 }
 
+function validatePlayerCountForStart(room) {
+  if (room.gameType === "berenike_shot") {
+    if (room.players.length < 2 || room.players.length > 8) throw new Error("Berenike Shot se joue de 2 à 8 joueurs.");
+    return;
+  }
+  if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour démarrer.");
+}
+
 export function startGame(code, requesterPlayerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (!requesterPlayerId || room.hostPlayerId !== requesterPlayerId) throw new Error("Seul l'hÃ´te peut dÃ©marrer la partie.");
-  if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour dÃ©marrer.");
+  if (!requesterPlayerId || room.hostPlayerId !== requesterPlayerId) throw new Error("Seul l'hôte peut démarrer la partie.");
+  validatePlayerCountForStart(room);
 
   room.turnIndex = Math.floor(Math.random() * room.players.length);
   room.pendingAttack = null;
 
   if (room.gameType === "awale") return startAwaleGame(room);
   if (room.gameType === "twenty_one") return startTwentyOneGame(room);
+  if (room.gameType === "berenike_shot") return startBerenikeShotGame(room);
   return startCardDuelGame(room);
 }
 
@@ -87,29 +101,47 @@ export function replayGame(code, requesterPlayerId) {
   if (!room) throw new Error("Room introuvable.");
   if (room.phase !== "finished") throw new Error("La partie n'est pas terminée.");
   if (!room.players.some((p) => p.id === requesterPlayerId)) throw new Error("Seuls les joueurs peuvent relancer.");
-  if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour relancer.");
+  validatePlayerCountForStart(room);
 
   room.turnIndex = Math.floor(Math.random() * room.players.length);
   room.pendingAttack = null;
   room.awale = null;
+  room.berenike = null;
   room.twentyOne = null;
   room.log.push({ at: Date.now(), type: "game_replay", message: "Nouvelle partie lancée." });
 
   if (room.gameType === "awale") return startAwaleGame(room);
   if (room.gameType === "twenty_one") return startTwentyOneGame(room);
+  if (room.gameType === "berenike_shot") return startBerenikeShotGame(room);
   return startCardDuelGame(room);
 }
 
 export function abortGame(code, playerId) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.phase === "finished" || room.phase === "lobby") throw new Error("Aucune partie en cours Ã  abandonner.");
+  if (room.phase === "finished" || room.phase === "lobby") throw new Error("Aucune partie en cours à abandonner.");
 
   const quitterSide = room.players.findIndex((p) => p.id === playerId);
   if (quitterSide < 0) throw new Error("Joueur introuvable.");
   const winnerSide = quitterSide === 0 ? 1 : 0;
 
   if (room.gameType === "twenty_one" && room.twentyOne) return abortTwentyOneGame(room, quitterSide, winnerSide);
+
+  if (room.gameType === "berenike_shot" && room.berenike) {
+    const quitter = room.players[quitterSide];
+    quitter.berenike.active = false;
+    quitter.berenike.hp = 0;
+    quitter.berenike.inventory = [];
+    const active = room.players.filter((player) => player.berenike?.active);
+    if (active.length === 1) {
+      room.phase = "finished";
+      room.berenike.winnerId = active[0].id;
+      room.log.push({ at: Date.now(), type: "game_finished", message: `${quitter.name} abandonne. ${active[0].name} remporte Berenike Shot.` });
+    } else {
+      room.log.push({ at: Date.now(), type: "abort", message: `${quitter.name} abandonne.` });
+    }
+    return room;
+  }
 
   if (room.gameType === "awale" && room.awale) {
     const remaining = room.awale.board.reduce((total, seeds) => total + seeds, 0);
@@ -168,6 +200,7 @@ export function getVisibleState(room, playerId) {
       awaleSide: room.players.findIndex((player) => player.id === p.id),
       handCount: p.hand.length,
       hand: p.id === playerId ? p.hand : undefined,
+      berenike: visibleBerenikePlayer(p, playerId),
       twentyOne: p.twentyOne
         ? {
             lives: p.twentyOne.lives,
@@ -189,6 +222,7 @@ export function getVisibleState(room, playerId) {
           }
         : null
     })),
+    berenike: visibleBerenikeState(room, playerId),
     twentyOne: room.twentyOne
       ? {
           round: room.twentyOne.round,

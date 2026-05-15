@@ -1,4 +1,5 @@
 import React from "react";
+import { BerenikeShotView } from "./BerenikeShotView.jsx";
 import { GAME_CHOICES } from "./gameChoices.js";
 import { styles } from "./styles.js";
 import { theme } from "./theme.js";
@@ -37,6 +38,7 @@ export function App() {
   const isLobbyPhase = state?.phase === "lobby";
   const isAwaleGame = state?.gameType === "awale";
   const isTwentyOneGame = state?.gameType === "twenty_one";
+  const isBerenikeGame = state?.gameType === "berenike_shot";
   const isHost = Boolean(state && me && state.hostPlayerId === me.id);
   const selectedMode = GAME_CHOICES.find((choice) => choice.id === gameType) ?? GAME_CHOICES[0];
   const defenseCards = React.useMemo(() => getDefenseCards(me), [me]);
@@ -194,6 +196,13 @@ export function App() {
     setState(null);
     setError("");
     setActiveCardId(null);
+  }
+
+  function lobbyGameTitle(type) {
+    if (type === "awale") return "Awalé classique";
+    if (type === "twenty_one") return "Twenty One";
+    if (type === "berenike_shot") return "Berenike Shot";
+    return "Duel de cartes";
   }
 
   function handleCardClick(card) {
@@ -650,7 +659,7 @@ export function App() {
             <header style={styles.menuHeader}>
               <h1 style={styles.menuTitle}>Lobby</h1>
               <span style={styles.menuSubtitle}>
-                Room {state.code}. {state.gameType === "awale" ? "Awalé classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"}. En attente des joueurs.
+                Room {state.code}. {lobbyGameTitle(state.gameType)}. En attente des joueurs.
               </span>
             </header>
 
@@ -714,7 +723,7 @@ export function App() {
             <div style={{ display: "none" }}>
             <strong style={{ fontSize: 20 }}>Lobby</strong>
             <p style={{ margin: 0 }}>
-              Room <strong>{state.code}</strong> · {state.gameType === "awale" ? "Awalé classique" : state.gameType === "twenty_one" ? "Twenty One" : "Duel de cartes"} · En attente des joueurs.
+              Room <strong>{state.code}</strong> · {lobbyGameTitle(state.gameType)} · En attente des joueurs.
             </p>
             <ul style={styles.lobbyPlayers}>
               {state.players.map((player) => (
@@ -735,6 +744,17 @@ export function App() {
             </div>
             </div>
           </section>
+        )}
+
+        {state && !isLobbyPhase && isBerenikeGame && (
+          <BerenikeShotView
+            state={state}
+            me={me}
+            isMobile={isMobile}
+            isMobilePortrait={isMobilePortrait}
+            emit={emit}
+            abortCurrentGame={abortCurrentGame}
+          />
         )}
 
         {state && !isLobbyPhase && isAwaleGame && (
@@ -1124,7 +1144,7 @@ export function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
+        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && !isBerenikeGame && (
           <section
             style={{
               ...styles.board,
@@ -1307,7 +1327,7 @@ export function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
+        {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && !isBerenikeGame && (
           <section style={{ ...styles.controls, marginTop: isMobilePortrait ? 8 : styles.controls.marginTop, padding: isMobilePortrait ? 8 : styles.controls.padding, borderRadius: isMobilePortrait ? 12 : styles.controls.borderRadius }}>
             <div>
               <strong>Actions de tour</strong>
@@ -1338,7 +1358,7 @@ export function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isTwentyOneGame && (
+        {state && !isLobbyPhase && !isTwentyOneGame && !isBerenikeGame && (
           <section style={{ ...styles.log, marginTop: isMobilePortrait ? 8 : styles.log.marginTop, maxHeight: isMobilePortrait ? 130 : styles.log.maxHeight, fontSize: isMobilePortrait ? 12 : styles.log.fontSize }}>
             <strong>Journal</strong>
             <ul>
@@ -1381,7 +1401,7 @@ export function App() {
           </div>
         )}
 
-        {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && isMyDefenseTurn && (
+        {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && !isBerenikeGame && isMyDefenseTurn && (
           <div style={styles.modalBackdrop}>
             <div style={{ ...styles.modal, padding: isMobile ? 12 : styles.modal.padding, animation: "defense-pop 220ms ease-out" }}>
               <h3 style={{ margin: 0 }}>🛡 Défense requise</h3>

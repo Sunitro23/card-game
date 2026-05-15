@@ -6,10 +6,12 @@ import {
   joinRoom,
   leaveBySocket,
   playersBySocketId,
+  shootBerenikeShot,
   rooms,
   spectateRoom,
   standTwentyOne,
-  startGame
+  startGame,
+  useBerenikeItem
 } from "../src/game.js";
 import {
   AWALE_SEEDS_PER_PIT,
@@ -167,5 +169,59 @@ describe("twenty one", () => {
       assert.ok(room.players.some((player) => player.twentyOne.lives === TWENTY_ONE_STARTING_LIVES - TWENTY_ONE_STARTING_BET));
     }
     assert.ok(room.players.every((player) => player.twentyOne.manualStand === false));
+  });
+});
+
+describe("berenike shot", () => {
+  beforeEach(resetState);
+
+  it("supports rooms with more than two players and starts with a public reserve", () => {
+    const room = createRoom("socket-a", "Alice", "berenike_shot");
+    joinRoom(room.code, "socket-b", "Bob");
+    joinRoom(room.code, "socket-c", "Chloe");
+    startGame(room.code, room.hostPlayerId);
+
+    const visible = getVisibleState(room, room.players[0].id);
+
+    assert.equal(room.phase, "berenike_shot");
+    assert.equal(room.players.length, 3);
+    assert.ok(room.players.every((player) => player.berenike.active));
+    assert.ok(room.players.every((player) => player.berenike.hp === 3));
+    assert.equal(room.berenike.publicCounts.real + room.berenike.publicCounts.blank, room.berenike.reserve.length);
+    assert.ok(room.berenike.publicCounts.real >= 1);
+    assert.ok(room.berenike.publicCounts.blank >= 1);
+    assert.equal(visible.berenike.reserveCount, room.berenike.reserve.length);
+    assert.ok(visible.players[0].berenike.inventory.length >= 2);
+  });
+
+  it("lets a blank self-shot keep the turn", () => {
+    const room = createTwoPlayerRoom("berenike_shot");
+    startGame(room.code, room.hostPlayerId);
+    const actor = room.players[room.turnIndex % room.players.length];
+    room.berenike.reserve = [{ id: "test_blank", type: "blank" }];
+    room.berenike.publicCounts = { real: 0, blank: 1 };
+
+    shootBerenikeShot(room.code, actor.id, actor.id);
+
+    assert.equal(room.phase, "berenike_shot");
+    assert.equal(room.players[room.turnIndex % room.players.length].id, actor.id);
+    assert.equal(actor.berenike.hp, actor.berenike.maxHp);
+  });
+
+  it("applies black powder to the next real shot only", () => {
+    const room = createTwoPlayerRoom("berenike_shot");
+    startGame(room.code, room.hostPlayerId);
+    const actor = room.players[room.turnIndex % room.players.length];
+    const target = room.players.find((player) => player.id !== actor.id);
+    const powder = { id: "powder", type: "black_powder", name: "Poudre Noire", icon: "■", desc: "" };
+    actor.berenike.inventory = [powder];
+    room.berenike.reserve = [{ id: "test_real", type: "real" }, { id: "test_blank", type: "blank" }];
+    room.berenike.publicCounts = { real: 1, blank: 1 };
+
+    useBerenikeItem(room.code, actor.id, { itemId: powder.id });
+    shootBerenikeShot(room.code, actor.id, target.id);
+
+    assert.equal(target.berenike.hp, target.berenike.maxHp - 2);
+    assert.equal(actor.berenike.powderArmed, false);
   });
 });

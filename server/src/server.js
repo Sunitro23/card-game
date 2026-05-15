@@ -9,6 +9,7 @@ import {
   leaveBySocket,
   playCard,
   performAttack,
+  shootBerenikeShot,
   drawCard,
   drawTwentyOneNumberCard,
   drawTwentyOneTrumpCard,
@@ -20,7 +21,8 @@ import {
   standTwentyOne,
   startGame,
   spectateRoom,
-  playersBySocketId
+  playersBySocketId,
+  useBerenikeItem
 } from "./game.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -160,6 +162,28 @@ io.on("connection", (socket) => {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
       standTwentyOne(ref.code, ref.playerId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("berenike:shoot", ({ targetPlayerId }) => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      shootBerenikeShot(ref.code, ref.playerId, targetPlayerId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("berenike:item", (payload) => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      useBerenikeItem(ref.code, ref.playerId, payload);
       emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);

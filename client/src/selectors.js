@@ -48,6 +48,9 @@ export function getGameWinner(state) {
   if (state.gameType === "twenty_one" && state.twentyOne?.winnerId) {
     return state.players.find((player) => player.id === state.twentyOne.winnerId) ?? null;
   }
+  if (state.gameType === "berenike_shot" && state.berenike?.winnerId) {
+    return state.players.find((player) => player.id === state.berenike.winnerId) ?? null;
+  }
   if (state.gameType === "awale" && state.awale?.winnerSide !== undefined) {
     if (state.awale.winnerSide === null) return null;
     return state.players.find((player) => player.awaleSide === state.awale.winnerSide) ?? null;
