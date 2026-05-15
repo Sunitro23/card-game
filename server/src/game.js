@@ -1,16 +1,17 @@
-import { ATTACKS, AWALE_PITS_PER_PLAYER, AWALE_SEEDS_PER_PIT, ENERGY_PER_TURN, MAX_DEFENSE_IN_HAND, MAX_ENERGY, MAX_HAND_SIZE, TWENTY_ONE_MAX_TRUMPS, TWENTY_ONE_STARTING_LIVES, TWENTY_ONE_STARTING_TARGET, TWENTY_ONE_TRUMPS_PER_ROUND } from "./core/constants.js";
+import { AWALE_PITS_PER_PLAYER } from "./core/constants.js";
 import { generateRoomCode, uid } from "./core/random.js";
 import { normalizeGameType } from "./core/gameTypes.js";
-import { getOpponent, makePlayer } from "./core/players.js";
+import { makePlayer } from "./core/players.js";
 import { playersBySocketId, rooms } from "./core/state.js";
-import { finishAwale, getLegalAwaleMoves, getPlayerSide, playAwaleMove, startAwaleGame } from "./games/awale.js";
+import { finishAwale, playAwaleMove, startAwaleGame } from "./games/awale.js";
 import { drawCard, endTurn, mulligan, performAttack, playCard, resolveDefense, startCardDuelGame } from "./games/cardDuel.js";
-import { abortTwentyOneGame, drawTwentyOneNumberCard, drawTwentyOneTrumpCard, playTwentyOneTrump, standTwentyOne, startTwentyOneGame, twentyOneTotalForTarget } from "./games/twentyOne.js";
+import { abortTwentyOneGame, drawTwentyOneNumberCard, drawTwentyOneTrumpCard, playTwentyOneTrump, standTwentyOne, startTwentyOneGame } from "./games/twentyOne.js";
 
 export { playersBySocketId, rooms } from "./core/state.js";
 export { drawCard, endTurn, mulligan, performAttack, playCard, resolveDefense } from "./games/cardDuel.js";
 export { playAwaleMove } from "./games/awale.js";
 export { drawTwentyOneNumberCard, drawTwentyOneTrumpCard, playTwentyOneTrump, standTwentyOne } from "./games/twentyOne.js";
+export { getVisibleState } from "./visibleState.js";
 
 export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
   let code = generateRoomCode();
@@ -128,104 +129,6 @@ export function abortGame(code, playerId) {
     message: `${room.players[quitterSide].name} abandonne. ${room.players[winnerSide].name} remporte le combat.`
   });
   return room;
-}
-
-export function getVisibleState(room, playerId) {
-  const viewer = room.players.find((p) => p.id === playerId);
-  const opponent = getOpponent(room, playerId);
-  const viewerRole = viewer ? "player" : "spectator";
-
-  return {
-    code: room.code,
-    phase: room.phase,
-    gameType: room.gameType,
-    config: {
-      maxEnergy: MAX_ENERGY,
-      energyPerTurn: ENERGY_PER_TURN,
-      maxHandSize: MAX_HAND_SIZE,
-      maxDefenseInHand: MAX_DEFENSE_IN_HAND,
-      attacks: Object.values(ATTACKS),
-      awale: { pitsPerPlayer: AWALE_PITS_PER_PLAYER, seedsPerPit: AWALE_SEEDS_PER_PIT },
-      twentyOne: { startingLives: TWENTY_ONE_STARTING_LIVES, startingTarget: TWENTY_ONE_STARTING_TARGET, trumpsPerRound: TWENTY_ONE_TRUMPS_PER_ROUND, maxTrumps: TWENTY_ONE_MAX_TRUMPS }
-    },
-    turnPlayerId: room.players[room.turnIndex % room.players.length]?.id,
-    pendingAttack: room.pendingAttack
-      ? {
-          id: room.pendingAttack.id,
-          attackerId: room.pendingAttack.attackerId,
-          targetId: room.pendingAttack.targetId,
-          facedown: false,
-          card: room.pendingAttack.card
-        }
-      : null,
-    hostPlayerId: room.hostPlayerId,
-    viewerRole,
-    spectatorCount: room.spectators?.length ?? 0,
-    cardDuel: room.cardDuel
-      ? {
-          lastEvent: room.cardDuel.lastEvent
-        }
-      : null,
-    players: room.players.map((p) => ({
-      id: p.id,
-      name: p.name,
-      hp: p.hp,
-      energy: p.energy,
-      position: p.position,
-      awaleSide: room.players.findIndex((player) => player.id === p.id),
-      handCount: p.hand.length,
-      hand: p.id === playerId ? p.hand : undefined,
-      twentyOne: p.twentyOne
-        ? {
-            lives: p.twentyOne.lives,
-            total: p.id === playerId
-              ? twentyOneTotalForTarget(p, room.twentyOne.target)
-              : twentyOneTotalForTarget({ ...p, twentyOne: { ...p.twentyOne, cards: p.twentyOne.cards.filter((card) => !card.hidden) } }, room.twentyOne.target),
-            stood: Boolean(p.twentyOne.manualStand),
-            manualStand: Boolean(p.twentyOne.manualStand),
-            autoBust: p.twentyOne.autoBust,
-            bless: p.twentyOne.bless,
-            hasPlayedCardThisRound: p.twentyOne.hasPlayedCardThisRound,
-            cards: p.twentyOne.cards.map((card) => ({
-              id: card.id,
-              value: p.id === playerId || !card.hidden ? card.value : null,
-              rank: p.id === playerId || !card.hidden ? card.rank : null,
-              hidden: card.hidden
-            })),
-            trumpCount: p.hand.length
-          }
-        : null
-    })),
-    twentyOne: room.twentyOne
-      ? {
-          round: room.twentyOne.round,
-          target: room.twentyOne.target,
-          bet: room.twentyOne.bet,
-          numberDeckCount: room.twentyOne.numberDeck.length,
-          trumpDeckCount: room.twentyOne.trumpDeck.length,
-          winnerId: room.twentyOne.winnerId,
-          lastRoundResult: room.twentyOne.lastRoundResult
-        }
-      : null,
-    awale: room.awale
-      ? {
-          board: room.awale.board,
-          captured: room.awale.captured,
-          legalMoves: viewer ? getLegalAwaleMoves(room, getPlayerSide(room, playerId)) : [],
-          finishedReason: room.awale.finishedReason,
-          winnerSide: room.awale.winnerSide,
-          lastMove: room.awale.lastMove
-        }
-      : null,
-    opponentHandPreview: viewer?.status.visionActive && opponent
-      ? opponent.hand.map((c) => ({
-          type: c.type,
-          defense: c.type === "defense" ? c.defense : undefined,
-          utility: c.type === "utility" ? c.utility : undefined
-        }))
-      : undefined,
-    log: room.log.slice(-20)
-  };
 }
 
 export function leaveBySocket(socketId) {
