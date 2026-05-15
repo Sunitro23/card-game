@@ -43,9 +43,12 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 
 - `room:create` `{ playerName, gameType? }` (`gameType` vaut `card_duel` par défaut, `awale` ou `twenty_one`)
 - `room:join` `{ code, playerName }`
+- `room:spectate` `{ code, spectatorName }`
 - `game:start` `{ code }`
+- `game:replay`
 - `turn:end` `{ code }`
 - `card:play` `{ code, cardId, targetPlayerId? }`
+- `combat:attack` `{ attackType, targetPlayerId? }`
 - `combat:defend` `{ code, attackId, defenseCardId? }`
 - `awale:move` `{ pitIndex }`
 - `twentyone:draw-number`
@@ -69,14 +72,13 @@ Le client Vite écoute en général sur `http://127.0.0.1:5173`.
 - Capture sur le camp adverse quand la dernière graine tombe dans un trou à 2 ou 3 graines, puis capture multiple sur les trous précédents valides.
 - Coups qui affament l'adversaire interdits, détection des boucles, score par graines capturées et abandon avec capture des graines restantes par l'adversaire.
 
-
 ## Mode Twenty One intégré côté serveur
 
 - Duel 1 contre 1 en manches, avec 3 vies par joueur et une cible de base à 21.
-- Chaque joueur construit son total avec des cartes numériques; le meilleur total est celui le plus proche de la cible active.
+- Chaque joueur construit son total avec des cartes numériques ; le meilleur total est celui le plus proche de la cible active.
 - Les Go For peuvent déplacer la cible vers 17, 24 ou 27, et le bet de la manche commence à 1.
 - Les Trumps Add Number, Go For, Bet et Deck sont jouables depuis la main : Add Number tente de récupérer une valeur précise, Bless peut sauver une mort, Destroy/Reincarnation annulent le dernier Trump adverse, et les Trumps Deck manipulent les dernières cartes numériques ou la pioche.
-- À la résolution d'une manche, le perdant perd le bet en vies; une égalité relance une nouvelle manche.
+- À la résolution d'une manche, le perdant perd le bet en vies ; une égalité relance une nouvelle manche.
 
 ## Règles MVP intégrées côté serveur
 
