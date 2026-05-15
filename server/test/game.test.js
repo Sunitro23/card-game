@@ -142,11 +142,10 @@ describe("twenty one", () => {
     assert.ok(room.players.every((player) => player.twentyOne.cards.length === 2));
     assert.ok(room.players.every((player) => player.hand.length === TWENTY_ONE_TRUMPS_PER_ROUND));
     assert.ok(visibleViewer.twentyOne.cards.every((card) => card.value !== null));
-    assert.ok(visibleOpponent.twentyOne.cards.some((card) => card.hidden && card.value === null));
-    assert.ok(visibleOpponent.twentyOne.cards.some((card) => !card.hidden && card.value !== null));
+    assert.ok(visibleOpponent.twentyOne.cards.every((card) => card.value === null));
   });
 
-  it("resolves the round when both players stand in sequence", () => {
+  it("starts a new round when both players stand without acting", () => {
     const room = createTwoPlayerRoom("twenty_one");
     startGame(room.code, room.hostPlayerId);
 
@@ -157,15 +156,8 @@ describe("twenty one", () => {
 
     assert.equal(room.phase, "twenty_one");
     assert.equal(room.twentyOne.round, 2);
-    assert.equal(room.twentyOne.lastRoundResult.round, 1);
-    assert.equal(typeof room.twentyOne.lastRoundResult.tie, "boolean");
-    assert.ok(Object.keys(room.twentyOne.lastRoundResult.scores).length === 2);
-    if (room.twentyOne.lastRoundResult.tie) {
-      assert.ok(room.players.every((player) => player.twentyOne.lives === TWENTY_ONE_STARTING_LIVES));
-    } else {
-      assert.equal(room.twentyOne.lastRoundResult.damage, TWENTY_ONE_STARTING_BET);
-      assert.ok(room.players.some((player) => player.twentyOne.lives === TWENTY_ONE_STARTING_LIVES - TWENTY_ONE_STARTING_BET));
-    }
+    assert.equal(room.twentyOne.lastRoundResult.tie, true);
+    assert.ok(room.players.every((player) => player.twentyOne.lives === TWENTY_ONE_STARTING_LIVES));
     assert.ok(room.players.every((player) => player.twentyOne.manualStand === false));
   });
 });

@@ -5,6 +5,7 @@ import { theme } from "./theme.js";
 import { AwaleDirectionRow, AwaleMiddleFlow, AwalePit } from "./awaleView.jsx";
 import { cardDetails, cardLabel, previewCardFromVision, soulsAttackCardTheme, soulsCardPalette, specialCardIcon, trumpShortEffect } from "./cardPresentation.js";
 import { getAwaleRows, getDefenseCards, getGameWinner, getInvalidDefenseCards, getIsSpectator, getMe, getOpponents, getSelectedTwentyOneTrump, getTwentyOneWinner, getValidDefenseCards, getVisibleDuelPlayers } from "./selectors.js";
+import { TwentyOneView } from "./TwentyOneView.jsx";
 import { useRoomSocket } from "./useRoomSocket.js";
 import { useViewport } from "./useViewport.js";
 
@@ -19,7 +20,7 @@ export function App() {
   const [copyFeedback, setCopyFeedback] = React.useState("");
   const [showAwaleRules, setShowAwaleRules] = React.useState(false);
   const [showTwentyOneRules, setShowTwentyOneRules] = React.useState(false);
-  const [defenseToast, setDefenseToast] = React.useState("");
+  const [duelResultPopup, setDuelResultPopup] = React.useState(null);
   const [trumpPopup, setTrumpPopup] = React.useState(null);
   const [twentyOneResultToast, setTwentyOneResultToast] = React.useState(null);
   const { viewport, isMobile, isMobilePortrait, isMobileLandscape } = useViewport();
@@ -57,15 +58,13 @@ export function App() {
   }, [me, activeCardId]);
 
   React.useEffect(() => {
-    const lastLog = state?.log?.[state.log.length - 1];
-    if (!lastLog) return;
+    const event = state?.cardDuel?.lastEvent;
+    if (!event?.id || state?.gameType !== "card_duel") return;
 
-    if (["counter", "counter_fail", "attack_resolved"].includes(lastLog.type)) {
-      setDefenseToast(lastLog.message);
-      const timer = setTimeout(() => setDefenseToast(""), 1800);
-      return () => clearTimeout(timer);
-    }
-  }, [state?.log]);
+    setDuelResultPopup(event);
+    const timer = setTimeout(() => setDuelResultPopup(null), 3200);
+    return () => clearTimeout(timer);
+  }, [state?.cardDuel?.lastEvent?.id, state?.gameType]);
 
   React.useEffect(() => {
     const lastLog = state?.log?.[state.log.length - 1];
@@ -210,6 +209,58 @@ export function App() {
 
     setActiveCardId(card.id);
   }
+
+  function duelResultCopy(event) {
+    if (!event) return null;
+    const defender = event.defenderId === me?.id ? "Tu" : event.defenderName;
+    const attacker = event.attackerId === me?.id ? "Tu" : event.attackerName;
+
+    if (event.type === "dodge") {
+      return {
+        label: "Esquive",
+        title: `${defender} esquive l'attaque`,
+        detail: "Aucun degat subi.",
+        meta: `${event.attackLabel} evitee`,
+        icon: "↺"
+      };
+    }
+    if (event.type === "block") {
+      return {
+        label: "Blocage",
+        title: `${defender} bloque`,
+        detail: event.damage > 0 ? `${event.damage} degat(s) passent.` : "Tout est absorbe.",
+        meta: `${event.attackLabel} reduite`,
+        icon: "▣"
+      };
+    }
+    if (event.type === "counter_melee" || event.type === "counter_magic") {
+      return {
+        label: "Contre reussi",
+        title: `${defender} contre`,
+        detail: `${event.reflectedDamage} degat(s) renvoyes a ${attacker}.`,
+        meta: "L'attaque est annulee",
+        icon: "⚔"
+      };
+    }
+    if (event.type === "counter_fail") {
+      return {
+        label: "Contre rate",
+        title: `${defender} rate son contre`,
+        detail: `${event.damage} degat(s) subis.`,
+        meta: `${event.attackLabel} touche`,
+        icon: "!"
+      };
+    }
+    return {
+      label: "Impact",
+      title: `${attacker} touche ${defender}`,
+      detail: `${event.damage} degat(s) subis.`,
+      meta: "Aucune defense jouee",
+      icon: "✦"
+    };
+  }
+
+  const duelResult = duelResultCopy(duelResultPopup);
 
   return (
     <main style={{ ...styles.page, padding: isMobilePortrait ? 0 : isMobile ? 6 : isMobileLandscape ? 4 : styles.page.padding }}>
@@ -873,255 +924,24 @@ export function App() {
 
 
         {state && !isLobbyPhase && isTwentyOneGame && (
-          <section style={{ ...styles.twentyOneShell, gap: isMobilePortrait ? 8 : styles.twentyOneShell.gap }}>
-            <div
-              style={{
-                ...styles.twentyOneTopBar,
-                gridTemplateColumns: isMobile ? "1fr auto" : styles.twentyOneTopBar.gridTemplateColumns,
-                padding: isMobile ? "6px 8px" : styles.twentyOneTopBar.padding,
-                gap: isMobile ? 8 : styles.twentyOneTopBar.gap,
-                fontSize: isMobile ? 12 : undefined
-              }}
-            >
-              <div style={styles.twentyOneGameTitle}>
-                <strong style={{ fontSize: isMobile ? 22 : 24, lineHeight: 1 }}>Manche {state.twentyOne?.round}</strong>
-                <span>{me?.hand?.length ?? 0}/6 spéciales</span>
-              </div>
-              <div style={{ justifySelf: "end", display: "flex", gap: 8, alignItems: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowTwentyOneRules((visible) => !visible)}
-                  style={{
-                    ...styles.twentyOneRulesToggle,
-                    minHeight: isMobile ? 30 : styles.twentyOneRulesToggle.minHeight,
-                    padding: isMobile ? "4px 8px" : styles.twentyOneRulesToggle.padding,
-                    fontSize: isMobile ? 12 : undefined
-                  }}
-                >
-                  {showTwentyOneRules ? "Masquer" : "Règles"}
-                </button>
-                <button
-                  onClick={abortCurrentGame}
-                  disabled={state.phase === "finished" || isSpectator}
-                  style={{
-                    minHeight: isMobile ? 30 : undefined,
-                    padding: isMobile ? "4px 8px" : undefined,
-                    fontSize: isMobile ? 12 : undefined
-                  }}
-                >
-                  Abandonner
-                </button>
-              </div>
-            </div>
-            {showTwentyOneRules && (
-              <section style={{ ...styles.ruleBox, borderColor: "rgba(216, 201, 167, 0.16)", background: "rgba(10, 9, 7, 0.7)", fontSize: isMobile ? 12 : styles.ruleBox.fontSize, padding: isMobile ? 8 : styles.ruleBox.padding }}>
-                <strong>Règles Twenty One</strong>
-                <span>Chaque manche vise la cible active. Les cartes Cible 17, 24 ou 27 peuvent la changer.</span>
-                <span>L'As vaut 1 ou 11 selon le meilleur total possible.</span>
-                <span>Chaque joueur commence avec 1 carte cachée et 1 carte visible. Le paquet de points contient une seule carte de chaque rang.</span>
-                <span>La manche se résout uniquement quand les 2 joueurs cliquent Rester à la suite.</span>
-                <span>Piocher passe le tour, mais remet cette chaîne de Rester à zéro.</span>
-                <span>Le perdant perd la mise en vies; Grâce peut empêcher une mort.</span>
-                <span>Les cartes spéciales gardées restent en main. +3 cartes spéciales par manche, jusqu'à 6 en main.</span>
-              </section>
-            )}
-
-            <div
-              style={{
-                ...styles.awaleTurnHint,
-                fontSize: isMobile ? 13 : 15,
-                padding: isMobile ? "7px 8px" : styles.awaleTurnHint.padding
-              }}
-            >
-              {isSpectator && state.phase !== "finished" ? "Mode spectateur." : isMyTurn && state.phase !== "finished" ? "À toi de jouer : pioche 1 fois pour passer, joue une carte spéciale ou clique Rester." : state.phase === "finished" ? "Partie terminée." : "Tour adverse."}
-            </div>
-
-            <div
-              style={{
-                ...styles.twentyOneLayout,
-                gridTemplateColumns: isMobile ? "1fr" : styles.twentyOneLayout.gridTemplateColumns,
-                gap: isMobile ? 8 : styles.twentyOneLayout.gap
-              }}
-            >
-              <div style={{ ...styles.twentyOneTable, padding: isMobile ? 8 : styles.twentyOneTable.padding, gap: isMobile ? 8 : styles.twentyOneTable.gap }}>
-                {(me ? [me, opponents[0]].filter(Boolean) : state.players).map((player) => {
-                  const isSelf = player.id === me?.id;
-                  const total = player.twentyOne?.total ?? 0;
-                  const target = state.twentyOne?.target ?? 21;
-                  const busted = total > target;
-                  const playerStatus = player.twentyOne?.stood ? "Reste" : player.id === state.turnPlayerId && state.phase !== "finished" ? "Tour actif" : busted ? "Bust" : "";
-                  const playerNote = [playerStatus, player.twentyOne?.bless ? "Grâce" : ""].filter(Boolean).join(" · ");
-                  return (
-                    <div key={player.id} style={{ ...styles.twentyOnePlayerPanel, borderTop: isSelf ? 0 : styles.twentyOnePlayerPanel.borderTop, padding: isMobile ? "4px 0" : styles.twentyOnePlayerPanel.padding }}>
-                      <div
-                        style={{
-                          ...styles.twentyOnePlayerHeader,
-                          gridTemplateColumns: isMobile ? "minmax(88px, 1fr) auto" : styles.twentyOnePlayerHeader.gridTemplateColumns,
-                          gap: isMobile ? 6 : styles.twentyOnePlayerHeader.gap
-                        }}
-                      >
-                        <span style={{ ...styles.twentyOnePlayerName, fontSize: isMobile ? 15 : styles.twentyOnePlayerName.fontSize }}>
-                          <span style={{ color: "#d84d3d" }}>♥</span> {player.twentyOne?.lives} {isSelf ? "Joueur" : player.name}
-                        </span>
-                        <span style={{ ...styles.twentyOneTotal, fontSize: isMobile ? 18 : styles.twentyOneTotal.fontSize }}>{total}/{target}</span>
-                        {playerNote && (
-                          <span style={{ ...styles.twentyOnePlayerMeta, gridColumn: isMobile ? "1 / -1" : undefined, fontSize: isMobile ? 11 : styles.twentyOnePlayerMeta.fontSize }}>
-                            {playerNote}
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          ...styles.twentyOneCardZone,
-                          minHeight: isMobile ? 56 : styles.twentyOneCardZone.minHeight,
-                          padding: isMobile ? 6 : styles.twentyOneCardZone.padding,
-                          gap: isMobile ? 6 : styles.twentyOneCardZone.gap
-                        }}
-                        aria-label={`Cartes jouées par ${player.name}`}
-                      >
-                        {(player.twentyOne?.cards ?? []).map((card, index) => (
-                          <div
-                            key={`${player.id}-num-${card.id}-${index}`}
-                            style={{
-                              ...styles.cardBack,
-                              width: isMobile ? 54 : 58,
-                              height: isMobile ? 74 : 78,
-                              background: card.hidden && !isSelf ? "linear-gradient(140deg, #11100d, #382817)" : "linear-gradient(140deg, #d8c08a, #6f3c19)",
-                              color: card.hidden && !isSelf ? "#d8c9a7" : "#160d07",
-                              flexDirection: "column"
-                            }}
-                          >
-                            <span style={{ fontSize: isMobile ? 10 : 11 }}>{card.hidden && !isSelf ? "CACHÉE" : "CARTE"}</span>
-                            <strong style={{ fontSize: isMobile ? 28 : 26 }}>{card.rank ?? card.value ?? "?"}</strong>
-                          </div>
-                        ))}
-                        {!(player.twentyOne?.cards?.length) && (
-                          <>
-                            <span style={{ ...styles.twentyOneGhostCard, width: isMobile ? 54 : styles.twentyOneGhostCard.width, height: isMobile ? 74 : styles.twentyOneGhostCard.height }} aria-hidden="true" />
-                            <span style={{ ...styles.twentyOneGhostCard, width: isMobile ? 54 : styles.twentyOneGhostCard.width, height: isMobile ? 74 : styles.twentyOneGhostCard.height }} aria-hidden="true" />
-                            {!isMobile && <span style={{ color: "rgba(232, 216, 181, 0.48)", fontSize: 12 }}>Cartes jouées</span>}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div style={styles.twentyOneActionsPanel}>
-                  <span style={styles.twentyOneStatLabel}>Actions disponibles</span>
-                  <div
-                    style={{
-                      ...styles.twentyOneActionRow,
-                      gridTemplateColumns: isMobile ? "1fr 1fr" : styles.twentyOneActionRow.gridTemplateColumns,
-                      gap: isMobile ? 8 : styles.twentyOneActionRow.gap
-                    }}
-                  >
-                    <button
-                      className="twenty-one-action"
-                      onClick={drawTwentyOneNumber}
-                      disabled={!isMyTurn || me?.twentyOne?.stood || me?.twentyOne?.hasDrawnThisTurn || state.phase === "finished"}
-                      style={{
-                        ...styles.twentyOneDrawAction,
-                        minHeight: isMobile ? 54 : styles.twentyOneDrawAction.minHeight,
-                        gridTemplateColumns: isMobile ? "28px 1fr" : styles.twentyOneDrawAction.gridTemplateColumns,
-                        padding: isMobile ? "6px 8px" : undefined,
-                        opacity: !isMyTurn || me?.twentyOne?.stood || me?.twentyOne?.hasDrawnThisTurn || state.phase === "finished" ? 0.6 : 1
-                      }}
-                    >
-                      <span style={{ fontSize: isMobile ? 21 : 28, lineHeight: 1 }}>🂡</span>
-                      <span>
-                        <span style={{ display: "block", fontSize: isMobile ? 14 : 17 }}>Piocher</span>
-                        <span style={{ display: "block", fontSize: isMobile ? 10 : 12, color: "rgba(255,240,201,0.72)" }}>1 fois puis passe</span>
-                      </span>
-                    </button>
-                    <button
-                      className="twenty-one-action"
-                      onClick={standTwentyOne}
-                      disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
-                      style={{
-                        ...styles.twentyOneStandAction,
-                        minHeight: isMobile ? 54 : styles.twentyOneStandAction.minHeight,
-                        padding: isMobile ? "6px 8px" : undefined,
-                        fontSize: isMobile ? 14 : undefined,
-                        opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : 1
-                      }}
-                    >
-                      Rester
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <aside style={{ ...styles.twentyOneTrumpPanel, padding: isMobile ? 8 : styles.twentyOneTrumpPanel.padding, gap: isMobile ? 8 : styles.twentyOneTrumpPanel.gap }}>
-                  <div style={styles.twentyOneSideStats}>
-                    <div style={styles.twentyOneSideStat}>
-                      <span style={styles.twentyOneStatLabel}>Mise</span>
-                      <strong style={{ ...styles.twentyOneSideStatValue, fontSize: isMobile ? 28 : styles.twentyOneSideStatValue.fontSize }}>
-                        {state.twentyOne?.bet ?? 0}
-                      </strong>
-                      <span style={styles.twentyOneSideStatHint}>vie(s) en jeu</span>
-                    </div>
-                    <div style={styles.twentyOneSideStat}>
-                      <span style={styles.twentyOneStatLabel}>Cible</span>
-                      <strong style={{ ...styles.twentyOneSideStatValue, fontSize: isMobile ? 28 : styles.twentyOneSideStatValue.fontSize }}>
-                        {state.twentyOne?.target ?? 21}
-                      </strong>
-                      <span style={styles.twentyOneSideStatHint}>à approcher</span>
-                    </div>
-                  </div>
-                  {me ? (
-                    <>
-                      <div style={{ display: "grid", gap: 2 }}>
-                        <strong>Cartes spéciales</strong>
-                        {!isMobile && <span style={{ color: "rgba(232, 216, 181, 0.56)", fontSize: 12 }}>+3 par manche, 6 en main maximum.</span>}
-                      </div>
-                      <div style={{ ...styles.twentyOneTrumpHand, gap: isMobile ? 4 : styles.twentyOneTrumpHand.gap }}>
-                        {me.hand.map((card) => {
-                      const palette = soulsCardPalette(card);
-                      const isActive = selectedTwentyOneTrump?.id === card.id;
-                      const isBustStand = me?.twentyOne?.autoBust || ((me?.twentyOne?.total ?? 0) > (state.twentyOne?.target ?? 21));
-                      const isVoluntaryStand = me?.twentyOne?.stood && !isBustStand;
-                      const trumpDescription = cardDetails(card);
-                      return (
-                        <button
-                          key={card.id}
-                          className="twenty-one-trump-card"
-                          type="button"
-                          disabled={!isMyTurn || me?.twentyOne?.stood || state.phase === "finished"}
-                          onClick={() => handleCardClick(card)}
-                          onMouseEnter={(event) => setHoveredTrump({ card, x: event.clientX, y: event.clientY })}
-                          onMouseMove={(event) => setHoveredTrump({ card, x: event.clientX, y: event.clientY })}
-                          onMouseLeave={() => setHoveredTrump(null)}
-                          onFocus={() => setHoveredTrump(null)}
-                          style={{
-                            ...styles.twentyOneTrumpCard,
-                            width: "100%",
-                            minHeight: isMobile ? 88 : styles.twentyOneTrumpCard.minHeight,
-                            aspectRatio: styles.twentyOneTrumpCard.aspectRatio,
-                            padding: isMobile ? 5 : styles.twentyOneTrumpCard.padding,
-                            background: palette.bg,
-                            border: isActive ? "1px solid rgba(240, 138, 53, 0.86)" : "1px solid rgba(229, 208, 156, 0.34)",
-                            opacity: !isMyTurn || me?.twentyOne?.stood || state.phase === "finished" ? 0.6 : isVoluntaryStand && !isActive ? 0.68 : 1
-                          }}
-                          aria-label={`${cardLabel(card)}. ${trumpDescription}`}
-                        >
-                          <strong style={{ ...styles.twentyOneTrumpTitle, fontSize: isMobile ? 10 : styles.twentyOneTrumpTitle.fontSize }}>{cardLabel(card)}</strong>
-                          <span style={{ ...styles.twentyOneTrumpIcon, fontSize: isMobile ? 36 : styles.twentyOneTrumpIcon.fontSize }}>{palette.icon}</span>
-                        </button>
-                      );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <span style={styles.twentyOneSideStatHint}>Mode spectateur : la mise reste visible pendant toute la manche.</span>
-                  )}
-                </aside>
-            </div>
-
-            {state.phase === "finished" && (
-              <strong style={{ justifySelf: "center" }}>{twentyOneWinner?.name ?? "Un joueur"} gagne.</strong>
-            )}
-          </section>
+          <TwentyOneView
+            state={state}
+            me={me}
+            opponents={opponents}
+            isMobile={isMobile}
+            isMobilePortrait={isMobilePortrait}
+            isSpectator={isSpectator}
+            isMyTurn={isMyTurn}
+            showRules={showTwentyOneRules}
+            selectedTrump={selectedTwentyOneTrump}
+            winner={twentyOneWinner}
+            onToggleRules={() => setShowTwentyOneRules((visible) => !visible)}
+            onAbort={abortCurrentGame}
+            onDrawNumber={drawTwentyOneNumber}
+            onStand={standTwentyOne}
+            onCardClick={handleCardClick}
+            onHoverTrump={setHoveredTrump}
+          />
         )}
 
         {state && !isLobbyPhase && !isAwaleGame && !isTwentyOneGame && (
@@ -1241,8 +1061,12 @@ export function App() {
                   </button>
                 </div>
                 {pendingAttack && (
-                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 130 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 66 : isMobile ? 78 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
-                    {`${pendingAttack.card.label} sur ${isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "cible"}`}
+                  <div style={{ ...styles.arenaSlot, flex: isMobilePortrait ? "1 1 150px" : undefined, width: isMobilePortrait ? "100%" : isMobile ? 150 : styles.arenaSlot.width, minHeight: isMobilePortrait ? 76 : isMobile ? 86 : styles.arenaSlot.minHeight, fontSize: isMobile ? 11 : styles.arenaSlot.fontSize }}>
+                    <span style={styles.arenaSlotLabel}>Defense en attente</span>
+                    <strong>{pendingAttack.card.label}</strong>
+                    <span style={styles.arenaSlotMeta}>
+                      cible: {isMyDefenseTurn ? "toi" : opponents[0]?.name ?? "adversaire"}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1338,7 +1162,7 @@ export function App() {
           </section>
         )}
 
-        {state && !isLobbyPhase && !isTwentyOneGame && (
+        {state && !isLobbyPhase && isAwaleGame && (
           <section style={{ ...styles.log, marginTop: isMobilePortrait ? 8 : styles.log.marginTop, maxHeight: isMobilePortrait ? 130 : styles.log.maxHeight, fontSize: isMobilePortrait ? 12 : styles.log.fontSize }}>
             <strong>Journal</strong>
             <ul>
@@ -1445,8 +1269,39 @@ export function App() {
           </div>
         )}
 
-        {defenseToast && (
-          <div style={styles.defenseToast}>{defenseToast}</div>
+        {!isLobbyPhase && !isAwaleGame && !isTwentyOneGame && duelResult && (
+          <div
+            key={duelResultPopup.id}
+            className={`twenty-one-winner-toast duel-result-popup${duelResultPopup.type === "counter_fail" ? " is-tie" : ""}`}
+            style={styles.duelResultPopup}
+          >
+            <span style={styles.twentyOneWinnerSparks} aria-hidden="true">
+              {[
+                [-112, -28],
+                [-72, 42],
+                [-24, -58],
+                [32, 58],
+                [76, -36],
+                [112, 22]
+              ].map(([x, y], index) => (
+                <span
+                  key={`${duelResultPopup.id}-${index}`}
+                  className="twenty-one-result-spark"
+                  style={{
+                    "--spark-x": `${x}px`,
+                    "--spark-y": `${y}px`,
+                    "--spark-delay": `${index * 70}ms`
+                  }}
+                />
+              ))}
+            </span>
+            <span style={styles.twentyOneWinnerLabel}>{duelResult.label}</span>
+            <strong style={styles.duelResultTitle}>
+              <span aria-hidden="true">{duelResult.icon}</span> {duelResult.title}
+            </strong>
+            <span style={styles.twentyOneWinnerMeta}>{duelResult.detail}</span>
+            <span style={styles.duelResultMeta}>{duelResult.meta}</span>
+          </div>
         )}
 
         {trumpPopup && (

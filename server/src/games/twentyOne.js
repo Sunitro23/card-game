@@ -80,30 +80,7 @@ function createTwentyOneTrumpDeck() {
 }
 
 function twentyOnePlayerState() {
-  return { lives: TWENTY_ONE_STARTING_LIVES, cards: [], stood: false, manualStand: false, autoBust: false, lastTrump: null, bless: false, hasDrawnThisTurn: false };
-}
-
-function resetTwentyOneStandChain(room) {
-  room.twentyOne.standStreak = 0;
-  room.twentyOne.lastStandPlayerId = null;
-  for (const player of room.players) {
-    player.twentyOne.stood = false;
-    player.twentyOne.manualStand = false;
-  }
-}
-
-function recordTwentyOneStand(room, player) {
-  player.twentyOne.stood = true;
-  player.twentyOne.manualStand = true;
-  player.twentyOne.autoBust = false;
-
-  if (room.twentyOne.lastStandPlayerId && room.twentyOne.lastStandPlayerId !== player.id) {
-    room.twentyOne.standStreak += 1;
-  } else {
-    room.twentyOne.standStreak = 1;
-  }
-
-  room.twentyOne.lastStandPlayerId = player.id;
+  return { lives: TWENTY_ONE_STARTING_LIVES, cards: [], stood: false, manualStand: false, autoBust: false, lastTrump: null, bless: false, hasPlayedCardThisRound: false };
 }
 
 export function twentyOneTotal(player) {
@@ -202,7 +179,7 @@ function resetTwentyOneRound(room) {
     player.twentyOne.autoBust = false;
     player.twentyOne.lastTrump = null;
     player.twentyOne.bless = false;
-    player.twentyOne.hasDrawnThisTurn = false;
+    player.twentyOne.hasPlayedCardThisRound = false;
     drawTwentyOneNumber(room, player, { hidden: true });
     drawTwentyOneNumber(room, player);
     drawTwentyOneTrump(room, player, TWENTY_ONE_TRUMPS_PER_ROUND);
@@ -254,6 +231,26 @@ function setTwentyOneRoundResult(room, result) {
 
 function resolveTwentyOneRound(room) {
   const [a, b] = room.players;
+  const noPlayerActed = room.players.every((player) => !player.twentyOne.hasPlayedCardThisRound);
+
+  if (noPlayerActed) {
+    setTwentyOneRoundResult(room, {
+      winnerId: null,
+      loserId: null,
+      damage: 0,
+      scores: {
+        [a.id]: twentyOneTotalForTarget(a, room.twentyOne.target),
+        [b.id]: twentyOneTotalForTarget(b, room.twentyOne.target)
+      },
+      tie: true,
+      gameOver: false
+    });
+    room.log.push({ at: Date.now(), type: "twenty_one_round_passed", message: `Manche ${room.twentyOne.round} terminée : les deux joueurs restent sans jouer de carte. Personne ne perd de vie.` });
+    resetTwentyOneRound(room);
+    room.log.push({ at: Date.now(), type: "twenty_one_round_start", message: `Manche ${room.twentyOne.round} lancée. Cible 21, mise 1.` });
+    return;
+  }
+
   const scoreA = scoreTwentyOnePlayer(a, room.twentyOne.target);
   const scoreB = scoreTwentyOnePlayer(b, room.twentyOne.target);
   let loser = null;
@@ -340,9 +337,8 @@ export function drawTwentyOneNumberCard(code, playerId) {
 
   const card = drawTwentyOneNumber(room, actor);
   if (!card) throw new Error("Deck vide.");
-  actor.twentyOne.hasDrawnThisTurn = true;
-  resetTwentyOneStandChain(room);
-  room.log.push({ at: Date.now(), type: "twenty_one_draw", message: `${actor.name} pioche une carte et passe son tour. La chaîne de Rester est remise à zéro.` });
+  actor.twentyOne.hasPlayedCardThisRound = true;
+  room.log.push({ at: Date.now(), type: "twenty_one_draw", message: `${actor.name} pioche une carte.` });
 
   refreshTwentyOneBustState(actor, room.twentyOne.target);
   passTwentyOneTurn(room, actor);
@@ -391,6 +387,7 @@ export function playTwentyOneTrump(code, playerId, cardId) {
     throw new Error("Cette carte n'est pas une carte spéciale Twenty One.");
   }
 
+  actor.twentyOne.hasPlayedCardThisRound = true;
   let consumed = true;
   let message = `${actor.name} joue ${card.name}.`;
 
