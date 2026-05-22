@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" role="img" aria-label="Mousquet stylise">
+  <defs>
+    <linearGradient id="wood" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#6f3618"/>
+      <stop offset="0.55" stop-color="#a65d25"/>
+      <stop offset="1" stop-color="#3b1c10"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#d9d6c9"/>
+      <stop offset="0.5" stop-color="#6f736f"/>
+      <stop offset="1" stop-color="#1f2220"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f2ce78"/>
+      <stop offset="1" stop-color="#8a5421"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M70 114 C105 66 161 59 214 92 L335 125 C405 146 470 141 536 114" stroke="url(#wood)" stroke-width="36"/>
+    <path d="M90 110 C125 82 164 77 205 102 L330 132 C397 147 454 138 512 116" stroke="#d98a3a" stroke-width="12" opacity="0.75"/>
+    <path d="M32 104 C50 74 87 58 126 70 C102 92 96 118 122 144 C84 149 47 135 32 104Z" fill="url(#wood)" stroke="#21130c" stroke-width="8"/>
+
+    <path d="M190 75 L574 75" stroke="#171918" stroke-width="24"/>
+    <path d="M196 67 L570 67" stroke="url(#metal)" stroke-width="12"/>
+    <path d="M218 57 L535 57" stroke="#e7e4d7" stroke-width="4" opacity="0.7"/>
+    <path d="M562 58 L612 68 L562 82Z" fill="url(#metal)" stroke="#171918" stroke-width="7"/>
+
+    <path d="M244 79 L244 125" stroke="url(#brass)" stroke-width="9"/>
+    <path d="M382 78 L382 126" stroke="url(#brass)" stroke-width="9"/>
+    <circle cx="304" cy="115" r="24" fill="url(#brass)" stroke="#24160d" stroke-width="7"/>
+    <circle cx="304" cy="115" r="8" fill="#d98a3a"/>
+    <path d="M340 105 C365 84 399 91 414 118" stroke="#262725" stroke-width="13"/>
+    <path d="M350 105 C368 95 390 101 400 120" stroke="#aaa89e" stroke-width="5"/>
+    <path d="M319 128 C340 153 381 153 403 128" stroke="#2a1a10" stroke-width="11"/>
+  </g>
+</svg>

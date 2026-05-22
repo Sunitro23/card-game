@@ -2,6 +2,7 @@ import React from "react";
 import { styles } from "./styles.js";
 
 const TARGET_ITEMS = new Set(["chains", "skeleton_key"]);
+const MUSKET_IMAGE_URL = "/musket.svg";
 
 function bulletLabel(type) {
   if (type === "real") return "réelle";
@@ -9,20 +10,20 @@ function bulletLabel(type) {
   return "inconnue";
 }
 
-function playerPoint(index, count) {
+function playerPoint(index, count, compact = false) {
   const angle = -90 + (360 / Math.max(count, 1)) * index;
   const rad = (angle * Math.PI) / 180;
   return {
-    left: 50 + Math.cos(rad) * 39,
-    top: 48 + Math.sin(rad) * 35,
+    left: 50 + Math.cos(rad) * (compact ? 38 : 39),
+    top: 48 + Math.sin(rad) * (compact ? 38 : 35),
     angle
   };
 }
 
-function getShotAngle(players, targetId) {
+function getShotAngle(players, targetId, compact = false) {
   const index = players.findIndex((player) => player.id === targetId);
   if (index < 0) return 0;
-  return playerPoint(index, players.length).angle;
+  return playerPoint(index, players.length, compact).angle;
 }
 
 function itemHint(item) {
@@ -35,12 +36,20 @@ function itemHint(item) {
 export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, abortCurrentGame }) {
   const [selectedItemId, setSelectedItemId] = React.useState(null);
   const [rulesOpen, setRulesOpen] = React.useState(false);
+  const [shotPopup, setShotPopup] = React.useState(null);
+  const [cyclePopup, setCyclePopup] = React.useState(null);
+  const [hoveredPlayerId, setHoveredPlayerId] = React.useState(null);
+  const previousShotIdRef = React.useRef(null);
+  const previousCycleRef = React.useRef(null);
+  const isCompactTable = isMobile || state.players.length > 4;
   const selectedItem = me?.berenike?.inventory?.find((item) => item.id === selectedItemId) ?? null;
   const currentPlayer = state.players.find((player) => player.id === state.turnPlayerId);
   const isMyTurn = Boolean(me && state.turnPlayerId === me.id && me.berenike?.active);
   const activePlayers = state.players.filter((player) => player.berenike?.active);
-  const lastTargetId = state.berenike?.lastShot?.targetId ?? state.turnPlayerId;
-  const musketAngle = getShotAngle(state.players, lastTargetId);
+  const lastShot = state.berenike?.lastShot;
+  const isShotAnimating = Boolean(shotPopup && lastShot?.id === shotPopup.id);
+  const musketAngle = isShotAnimating ? getShotAngle(state.players, lastShot.targetId, isCompactTable) : 0;
+  const hoveredPlayer = state.players.find((player) => player.id === hoveredPlayerId);
 
   React.useEffect(() => {
     if (!selectedItemId) return;
@@ -48,6 +57,42 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
       setSelectedItemId(null);
     }
   }, [me, selectedItemId]);
+
+  React.useEffect(() => {
+    const lastShot = state.berenike?.lastShot;
+    if (!lastShot?.id) return;
+    if (previousShotIdRef.current === lastShot.id) return;
+    previousShotIdRef.current = lastShot.id;
+
+    const shooter = state.players.find((player) => player.id === lastShot.shooterId);
+    const target = state.players.find((player) => player.id === lastShot.targetId);
+    setShotPopup({
+      id: lastShot.id,
+      bulletType: lastShot.bulletType,
+      damage: lastShot.damage,
+      shooterName: shooter?.name ?? "Joueur",
+      targetName: target?.name ?? "cible"
+    });
+
+    const timer = window.setTimeout(() => setShotPopup(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [state.berenike?.lastShot?.id, state.players]);
+
+  React.useEffect(() => {
+    const cycle = state.berenike?.cycle;
+    if (!cycle || previousCycleRef.current === cycle) return;
+    previousCycleRef.current = cycle;
+
+    setCyclePopup({
+      cycle,
+      reserveCount: state.berenike.reserveCount,
+      real: state.berenike.publicCounts.real,
+      blank: state.berenike.publicCounts.blank
+    });
+
+    const timer = window.setTimeout(() => setCyclePopup(null), 1500);
+    return () => window.clearTimeout(timer);
+  }, [state.berenike?.cycle, state.berenike?.reserveCount, state.berenike?.publicCounts.real, state.berenike?.publicCounts.blank]);
 
   function useItem(item, targetPlayer = null) {
     if (!item || !isMyTurn) return;
@@ -91,10 +136,12 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
   return (
     <section style={{ display: "grid", gap: 10, width: "100%" }}>
       <style>{`
-        .berenike-player:hover .berenike-inventory { opacity: 1; transform: translate(-50%, -8px); pointer-events: auto; }
-        .berenike-target:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.04); filter: brightness(1.12); }
-        .berenike-item:hover:not(:disabled), .berenike-item.is-selected { transform: translateY(-8px); border-color: rgba(240, 189, 91, 0.9); }
-        @keyframes berenike-shot-kick { 0% { translate: 0 0; } 40% { translate: -8px 0; } 100% { translate: 0 0; } }
+        .berenike-player:hover { z-index: 24 !important; }
+        .berenike-target:hover:not(:disabled) { transform: scale(1.01); }
+        .berenike-item:hover:not(:disabled), .berenike-item.is-selected { border-color: #d8bd77; }
+        @keyframes berenike-shot-kick { 0% { translate: 0 0; } 45% { translate: -8px 0; } 100% { translate: 0 0; } }
+        @keyframes berenike-muzzle { 0% { opacity: 1; } 100% { opacity: 0; transform: translate(18px, -50%) scale(1.25); } }
+        @keyframes berenike-popup-in { 0% { opacity: 0; } 100% { opacity: 1; } }
       `}</style>
 
       <div style={topBarStyle(isMobile)}>
@@ -104,6 +151,12 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
             Tour de {currentPlayer?.name ?? "personne"} · {activePlayers.length} actif(s)
           </div>
         </div>
+        <div style={reserveSummaryStyle(isMobile)}>
+          <strong>Cycle {state.berenike.cycle}</strong>
+          <span>{state.berenike.reserveCount} balle(s)</span>
+          <span><span style={bulletDotStyle("real")} /> {state.berenike.publicCounts.real} réelle(s)</span>
+          <span><span style={bulletDotStyle("blank")} /> {state.berenike.publicCounts.blank} factice(s)</span>
+        </div>
         <div style={topActionsStyle(isMobile)}>
           <button type="button" onClick={() => setRulesOpen((value) => !value)}>?</button>
           <button type="button" onClick={abortCurrentGame} disabled={!me || state.phase === "finished"}>Abandon</button>
@@ -111,27 +164,8 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
       </div>
 
       <div style={tableStyle(isMobilePortrait)}>
-        <aside style={reservePanelStyle(isMobile)}>
-          <strong>Cycle de réserve</strong>
-          <div style={bulletRowStyle}>
-            {Array.from({ length: state.berenike.reserveCount }).map((_, index) => (
-              <span key={`bullet-${index}`} style={bulletDotStyle(index < state.berenike.publicCounts.real ? "real" : "blank")} />
-            ))}
-          </div>
-          <span><b>{state.berenike.publicCounts.real}</b> réelle(s)</span>
-          <span><b>{state.berenike.publicCounts.blank}</b> factice(s)</span>
-          {state.berenike.secret?.nextBullet && (
-            <span style={secretStyle}>Prochaine: {bulletLabel(state.berenike.secret.nextBullet)}</span>
-          )}
-          {state.berenike.secret?.futureBullet && (
-            <span style={secretStyle}>
-              Position {state.berenike.secret.futureBullet.position}: {bulletLabel(state.berenike.secret.futureBullet.type)}
-            </span>
-          )}
-        </aside>
-
         {state.players.map((player, index) => {
-          const point = playerPoint(index, state.players.length);
+          const point = playerPoint(index, state.players.length, isCompactTable);
           const isCurrent = state.turnPlayerId === player.id;
           const isSelf = me?.id === player.id;
           const canTarget = isMyTurn && player.berenike?.active;
@@ -139,6 +173,10 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
             <div
               key={player.id}
               className="berenike-player"
+              onMouseEnter={() => setHoveredPlayerId(player.id)}
+              onMouseLeave={() => setHoveredPlayerId((current) => current === player.id ? null : current)}
+              onFocus={() => setHoveredPlayerId(player.id)}
+              onBlur={() => setHoveredPlayerId((current) => current === player.id ? null : current)}
               style={{
                 position: "absolute",
                 left: `${point.left}%`,
@@ -151,49 +189,48 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
                 className="berenike-target"
                 type="button"
                 onClick={() => handlePlayerClick(player)}
-                disabled={!canTarget}
-                style={playerButtonStyle({ isCurrent, isSelf, isActive: player.berenike?.active })}
+                data-disabled={!canTarget}
+                style={playerButtonStyle({ isCurrent, isSelf, isActive: player.berenike?.active, compact: isCompactTable })}
                 title={selectedItem ? itemHint(selectedItem) : "Tirer sur cette cible"}
               >
-                <span style={avatarStyle(player)}>{player.name.slice(0, 1).toUpperCase()}</span>
-                <span style={{ display: "grid", gap: 2, minWidth: 72 }}>
+                <span style={{ display: "grid", gap: 2, minWidth: isCompactTable ? 0 : 72, justifyItems: isCompactTable ? "center" : "start" }}>
                   <b>{player.name}</b>
                   <span>♥ {player.berenike?.hp ?? 0}/{player.berenike?.maxHp ?? 0}</span>
-                  <span>☗ {player.berenike?.inventoryCount ?? 0}{player.berenike?.skipped ? " · entravé" : ""}</span>
+                  {!isCompactTable && <span>☗ {player.berenike?.inventoryCount ?? 0}{player.berenike?.skipped ? " · entravé" : ""}</span>}
                 </span>
               </button>
-              <div className="berenike-inventory" style={hoverInventoryStyle}>
-                {(player.berenike?.inventory ?? []).length ? player.berenike.inventory.map((item) => (
-                  <span key={item.id} title={item.desc} style={miniItemStyle}>{item.icon}</span>
-                )) : <span style={{ opacity: 0.7 }}>Aucun</span>}
-              </div>
             </div>
           );
         })}
 
         <div style={musketWrapStyle}>
           <div
+            key={isShotAnimating ? lastShot.id : "idle-musket"}
             style={{
               ...musketStyle,
+              width: isMobile ? 210 : 286,
+              height: isMobile ? 64 : 86,
               transform: `rotate(${musketAngle}deg)`,
-              animation: state.berenike.lastShot?.id ? "berenike-shot-kick 240ms ease-out" : "none"
+              animation: isShotAnimating ? "berenike-shot-kick 240ms ease-out" : "none"
             }}
           >
-            <span style={musketBarrelStyle} />
-            <span style={musketStockStyle} />
-            <span style={musketLockStyle} />
+            <img
+              src={MUSKET_IMAGE_URL}
+              alt=""
+              draggable="false"
+              style={musketImageStyle}
+            />
+            {isShotAnimating && (
+              <>
+                <span style={muzzleFlashStyle(lastShot.bulletType, isMobile)} />
+              </>
+            )}
           </div>
           <div style={turnPlaqueStyle}>
             {isMyTurn ? (selectedItem ? itemHint(selectedItem) : "Choisis une cible") : "En attente"}
           </div>
         </div>
 
-        <aside style={quickRulesStyle(isMobile)}>
-          <strong>Règles rapides</strong>
-          <span>Balle réelle: 1 dégât.</span>
-          <span>Balle factice: aucun dégât.</span>
-          <span>Se viser avec une factice conserve le tour.</span>
-        </aside>
       </div>
 
       <div style={handPanelStyle}>
@@ -223,15 +260,6 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
         </div>
       </div>
 
-      <section style={{ ...styles.log, marginTop: 0 }}>
-        <strong>Journal</strong>
-        <ul>
-          {state.log.map((entry, idx) => (
-            <li key={`${entry.at}-${idx}`}>{entry.message}</li>
-          ))}
-        </ul>
-      </section>
-
       {rulesOpen && (
         <div style={styles.modalBackdrop}>
           <div style={{ ...styles.modal, maxWidth: 620 }}>
@@ -243,19 +271,68 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
           </div>
         </div>
       )}
+
+      {shotPopup && (
+        <div style={shotPopupStyle(shotPopup.bulletType)}>
+          <strong>{shotPopup.bulletType === "real" ? "Balle réelle" : "Balle à blanc"}</strong>
+          <span>
+            {shotPopup.bulletType === "real"
+              ? `${shotPopup.targetName} perd ${shotPopup.damage} PV`
+              : "Aucun dégât"}
+          </span>
+        </div>
+      )}
+
+      {cyclePopup && (
+        <div style={cyclePopupStyle}>
+          <strong>Nouveau cycle</strong>
+          <span>Cycle {cyclePopup.cycle} · {cyclePopup.reserveCount} balle(s)</span>
+          <span>
+            <span style={bulletDotStyle("real")} /> {cyclePopup.real} réelle(s)
+            <span style={{ display: "inline-block", width: 10 }} />
+            <span style={bulletDotStyle("blank")} /> {cyclePopup.blank} factice(s)
+          </span>
+        </div>
+      )}
+
+      {hoveredPlayer && (
+        <div style={globalInventoryPopupStyle}>
+          <strong>{hoveredPlayer.name}</strong>
+          <span style={inventoryTitleStyle}>Inventaire</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+            {(hoveredPlayer.berenike?.inventory ?? []).length ? hoveredPlayer.berenike.inventory.map((item) => (
+              <span key={item.id} title={`${item.name}: ${item.desc}`} style={miniItemStyle}>{item.icon}</span>
+            )) : <span style={{ opacity: 0.7 }}>Aucun</span>}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
 const topBarStyle = (isMobile) => ({
   display: "grid",
-  gridTemplateColumns: isMobile ? "1fr" : "1fr auto",
+  gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto",
   gap: 10,
   alignItems: "center",
   border: "1px solid rgba(216, 201, 167, 0.22)",
-  background: "linear-gradient(90deg, rgba(20,17,12,0.94), rgba(8,7,6,0.94))",
+  background: "#100d0a",
   padding: 12,
   borderRadius: 4
+});
+
+const reserveSummaryStyle = (isMobile) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: isMobile ? "flex-start" : "center",
+  gap: isMobile ? 8 : 12,
+  flexWrap: "wrap",
+  padding: "8px 10px",
+  borderRadius: 4,
+  border: "1px solid rgba(216,201,167,0.3)",
+  background: "#18120c",
+  color: "#f4e7c8",
+  fontSize: isMobile ? 12 : 13
 });
 
 const topActionsStyle = (isMobile) => ({
@@ -266,118 +343,51 @@ const topActionsStyle = (isMobile) => ({
 
 const tableStyle = (isMobilePortrait) => ({
   position: "relative",
-  minHeight: isMobilePortrait ? "min(72vh, 620px)" : 640,
+  minHeight: isMobilePortrait ? "min(70vh, 610px)" : 600,
   border: "1px solid rgba(216, 201, 167, 0.3)",
   borderRadius: 4,
   overflow: "hidden",
-  background: "radial-gradient(circle at 50% 48%, rgba(129,76,33,0.48), rgba(38,24,14,0.9) 32%, rgba(5,4,3,0.98) 72%), repeating-radial-gradient(circle at 50% 50%, rgba(232,216,181,0.08) 0 1px, transparent 1px 54px)",
-  boxShadow: "inset 0 0 90px rgba(0,0,0,0.82), 0 18px 34px rgba(0,0,0,0.48)"
+  background: "#0b0907",
+  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.02)"
 });
-
-const reservePanelStyle = (isMobile) => ({
-  position: "absolute",
-  left: 12,
-  top: 12,
-  zIndex: 6,
-  width: isMobile ? 176 : 230,
-  display: "grid",
-  gap: 7,
-  padding: 12,
-  borderRadius: 4,
-  border: "1px solid rgba(216,201,167,0.34)",
-  background: "linear-gradient(160deg, rgba(9,8,6,0.88), rgba(32,24,15,0.82))",
-  color: "#f4e7c8",
-  fontSize: isMobile ? 12 : 14
-});
-
-const quickRulesStyle = (isMobile) => ({
-  position: "absolute",
-  right: 12,
-  bottom: 12,
-  zIndex: 6,
-  width: isMobile ? 184 : 260,
-  display: "grid",
-  gap: 7,
-  padding: 12,
-  borderRadius: 4,
-  border: "1px solid rgba(216,201,167,0.34)",
-  background: "linear-gradient(160deg, rgba(9,8,6,0.88), rgba(32,24,15,0.82))",
-  color: "#f4e7c8",
-  fontSize: isMobile ? 12 : 14
-});
-
-const bulletRowStyle = { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" };
 
 const bulletDotStyle = (type) => ({
-  width: 16,
-  height: 16,
+  display: "inline-block",
+  width: 10,
+  height: 10,
   borderRadius: "50%",
-  border: "1px solid rgba(255,255,255,0.58)",
-  background: type === "real"
-    ? "radial-gradient(circle at 35% 30%, #ff705f, #8d1710 70%)"
-    : "radial-gradient(circle at 35% 30%, #fff, #8c8c8c 70%)",
-  boxShadow: "0 2px 5px rgba(0,0,0,0.5)"
+  marginRight: 4,
+  border: "1px solid rgba(255,255,255,0.45)",
+  background: type === "real" ? "#c24134" : "#d7d2c6"
 });
 
-const secretStyle = {
-  marginTop: 4,
-  color: "#ffe0a0",
-  fontWeight: 900
-};
-
-const playerButtonStyle = ({ isCurrent, isSelf, isActive }) => ({
-  width: 178,
-  minHeight: 82,
+const playerButtonStyle = ({ isCurrent, isSelf, isActive, compact }) => ({
+  width: compact ? 86 : 168,
+  minHeight: compact ? 68 : 78,
   display: "grid",
-  gridTemplateColumns: "58px 1fr",
+  gridTemplateColumns: "1fr",
   alignItems: "center",
-  gap: 8,
-  padding: 8,
+  justifyItems: compact ? "center" : "stretch",
+  gap: compact ? 4 : 8,
+  padding: compact ? 6 : 8,
   borderRadius: 4,
   border: isCurrent ? "2px solid rgba(255, 203, 99, 0.95)" : "1px solid rgba(216, 201, 167, 0.4)",
-  background: isActive
-    ? "linear-gradient(90deg, rgba(15,13,10,0.95), rgba(54,39,25,0.84))"
-    : "linear-gradient(90deg, rgba(8,8,7,0.82), rgba(24,24,22,0.7))",
+  background: isActive ? "#18120d" : "#0d0d0c",
   color: isActive ? "#f4e7c8" : "rgba(232,216,181,0.48)",
   opacity: isActive ? 1 : 0.62,
-  boxShadow: isCurrent ? "0 0 24px rgba(255,181,70,0.44), inset 0 0 18px rgba(0,0,0,0.62)" : "0 10px 20px rgba(0,0,0,0.44)",
-  textAlign: "left",
+  boxShadow: isCurrent ? "0 0 0 2px rgba(255,181,70,0.2)" : "none",
+  textAlign: compact ? "center" : "left",
   transition: "transform 140ms ease, filter 140ms ease",
   outline: isSelf ? "1px solid rgba(88, 207, 91, 0.7)" : "none"
 });
 
-const avatarStyle = (player) => ({
-  width: 54,
-  height: 54,
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  border: "2px solid rgba(232,216,181,0.68)",
-  background: player.berenike?.active
-    ? "radial-gradient(circle at 40% 28%, rgba(240,138,53,0.74), rgba(25,18,12,0.96) 66%)"
-    : "linear-gradient(135deg, #272727, #080808)",
-  fontSize: 24,
-  fontWeight: 900
-});
-
-const hoverInventoryStyle = {
-  position: "absolute",
-  left: "50%",
-  bottom: "100%",
-  transform: "translate(-50%, 2px)",
-  opacity: 0,
-  pointerEvents: "none",
-  transition: "opacity 140ms ease, transform 140ms ease",
-  minWidth: 130,
-  display: "flex",
-  gap: 5,
-  flexWrap: "wrap",
-  justifyContent: "center",
-  padding: 8,
-  borderRadius: 4,
-  border: "1px solid rgba(216,201,167,0.36)",
-  background: "rgba(6,5,4,0.95)",
-  boxShadow: "0 10px 20px rgba(0,0,0,0.54)"
+const inventoryTitleStyle = {
+  flex: "1 0 100%",
+  color: "rgba(244,231,200,0.72)",
+  fontSize: 11,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  textAlign: "center"
 };
 
 const miniItemStyle = {
@@ -387,7 +397,7 @@ const miniItemStyle = {
   placeItems: "center",
   borderRadius: 3,
   border: "1px solid rgba(216,201,167,0.34)",
-  background: "rgba(68,47,27,0.76)",
+  background: "#25180f",
   color: "#ffe0a0",
   fontWeight: 900
 };
@@ -400,69 +410,124 @@ const musketWrapStyle = {
   zIndex: 3,
   display: "grid",
   placeItems: "center",
-  gap: 18
+  gap: 28,
+  pointerEvents: "none"
 };
 
 const musketStyle = {
   position: "relative",
-  width: 250,
-  height: 64,
+  width: 238,
+  height: 82,
   transformOrigin: "50% 50%",
-  transition: "transform 280ms ease",
-  filter: "drop-shadow(0 16px 18px rgba(0,0,0,0.64))"
+  transition: "transform 180ms ease",
+  filter: "none",
+  overflow: "visible"
 };
 
-const musketBarrelStyle = {
+const musketImageStyle = {
   position: "absolute",
-  left: 86,
-  top: 22,
-  width: 148,
-  height: 16,
-  borderRadius: "999px",
-  border: "1px solid rgba(255,231,174,0.7)",
-  background: "linear-gradient(180deg, #f2d08a, #7a5124 48%, #1a120a 52%, #b98643)",
-  boxShadow: "inset 0 0 8px rgba(0,0,0,0.68)"
-};
-
-const musketStockStyle = {
-  position: "absolute",
-  left: 12,
-  top: 28,
-  width: 112,
-  height: 24,
-  borderRadius: "70% 35% 45% 70%",
-  transform: "rotate(-12deg)",
-  background: "linear-gradient(135deg, #7d3d18, #2c1208 70%)",
-  border: "1px solid rgba(255,190,96,0.45)"
-};
-
-const musketLockStyle = {
-  position: "absolute",
-  left: 82,
-  top: 12,
-  width: 36,
-  height: 32,
-  borderRadius: 8,
-  background: "linear-gradient(135deg, #d6a65a, #422816)",
-  border: "1px solid rgba(255,231,174,0.5)"
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  opacity: 0.92,
+  filter: "none",
+  pointerEvents: "none",
+  userSelect: "none"
 };
 
 const turnPlaqueStyle = {
   minWidth: 230,
+  position: "relative",
+  zIndex: 2,
+  marginTop: 14,
   padding: "10px 14px",
   borderRadius: 4,
   border: "1px solid rgba(216,201,167,0.34)",
-  background: "linear-gradient(180deg, rgba(45,31,18,0.94), rgba(10,8,6,0.94))",
+  background: "#15100c",
   color: "#f4e7c8",
   textAlign: "center",
   fontWeight: 900,
-  boxShadow: "0 12px 22px rgba(0,0,0,0.48)"
+  boxShadow: "none"
+};
+
+const muzzleFlashStyle = (bulletType, isMobile = false) => ({
+  position: "absolute",
+  left: isMobile ? 198 : 270,
+  top: isMobile ? 30 : 40,
+  width: bulletType === "real" ? 30 : 22,
+  height: bulletType === "real" ? 30 : 22,
+  borderRadius: "50%",
+  background: bulletType === "real" ? "#f0c25b" : "#d7d2c6",
+  transform: "translate(0, -50%)",
+  animation: "berenike-muzzle 260ms ease-out both",
+  pointerEvents: "none"
+});
+
+const shotPopupStyle = (bulletType) => ({
+  position: "fixed",
+  left: "50%",
+  top: "42%",
+  zIndex: 60,
+  minWidth: "min(88vw, 240px)",
+  display: "grid",
+  justifyItems: "center",
+  gap: 5,
+  padding: "12px 14px",
+  borderRadius: 4,
+  border: bulletType === "real" ? "1px solid #c24134" : "1px solid #d7d2c6",
+  background: "#15100c",
+  color: "#fff0c9",
+  textAlign: "center",
+  boxShadow: "none",
+  animation: "berenike-popup-in 100ms ease-out both",
+  pointerEvents: "none"
+});
+
+const cyclePopupStyle = {
+  position: "fixed",
+  right: 16,
+  top: 96,
+  zIndex: 62,
+  width: "min(86vw, 260px)",
+  display: "grid",
+  justifyItems: "start",
+  gap: 5,
+  padding: "10px 12px",
+  borderRadius: 4,
+  border: "1px solid rgba(216,201,167,0.45)",
+  background: "#15100c",
+  color: "#fff0c9",
+  textAlign: "left",
+  fontSize: 13,
+  boxShadow: "none",
+  animation: "berenike-popup-in 100ms ease-out both",
+  pointerEvents: "none"
+};
+
+const globalInventoryPopupStyle = {
+  position: "fixed",
+  right: 16,
+  top: 124,
+  zIndex: 72,
+  width: "min(86vw, 230px)",
+  display: "grid",
+  justifyItems: "center",
+  gap: 7,
+  padding: "10px 12px",
+  borderRadius: 4,
+  border: "1px solid rgba(216,201,167,0.45)",
+  background: "#15100c",
+  color: "#fff0c9",
+  boxShadow: "none",
+  pointerEvents: "none",
+  animation: "berenike-popup-in 120ms ease-out both"
 };
 
 const handPanelStyle = {
   borderRadius: 4,
   border: "1px solid rgba(216,201,167,0.28)",
-  background: "linear-gradient(180deg, rgba(18,14,10,0.96), rgba(6,5,4,0.98))",
+  background: "#100d0a",
   padding: 12,
   display: "grid",
   gap: 10
@@ -473,18 +538,18 @@ const itemRowStyle = {
   gap: 10,
   overflowX: "auto",
   padding: "8px 2px 12px",
-  minHeight: 134
+  minHeight: 104
 };
 
 const itemCardStyle = (selected) => ({
-  flex: "0 0 118px",
-  minHeight: 120,
+  flex: "0 0 104px",
+  minHeight: 96,
   borderRadius: 4,
   border: selected ? "1px solid rgba(240,189,91,0.9)" : "1px solid rgba(216,201,167,0.42)",
-  background: "radial-gradient(circle at 50% 18%, rgba(240,138,53,0.22), transparent 38%), linear-gradient(180deg, #b8955d, #634225 46%, #18100a)",
-  color: "#170f08",
+  background: selected ? "#2a1d12" : "#18120d",
+  color: "#f4e7c8",
   textShadow: "none",
-  boxShadow: "inset 0 0 20px rgba(255,240,196,0.18), 0 10px 18px rgba(0,0,0,0.42)",
+  boxShadow: "none",
   display: "grid",
   justifyItems: "center",
   alignContent: "center",
