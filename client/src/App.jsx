@@ -13,6 +13,7 @@ export function App() {
   const [name, setName] = React.useState("Joueur");
   const [code, setCode] = React.useState("");
   const [gameType, setGameType] = React.useState("card_duel");
+  const [selectedOpponentId, setSelectedOpponentId] = React.useState("");
   const [roomAction, setRoomAction] = React.useState("join");
   const { state, setState, error, setError, ensureConnection, emit, disconnect } = useRoomSocket();
   const [activeCardId, setActiveCardId] = React.useState(null);
@@ -57,6 +58,23 @@ export function App() {
       setActiveCardId(null);
     }
   }, [me, activeCardId]);
+
+  React.useEffect(() => {
+    if (!state || state.phase !== "lobby") return;
+    setGameType(state.gameType ?? "card_duel");
+  }, [state?.code, state?.phase, state?.gameType]);
+
+  React.useEffect(() => {
+    if (!state || state.phase !== "lobby" || !me) return;
+    const availableOpponent = state.players.find((player) => player.id !== me.id);
+    if (!availableOpponent) {
+      setSelectedOpponentId("");
+      return;
+    }
+    if (!state.players.some((player) => player.id === selectedOpponentId && player.id !== me.id)) {
+      setSelectedOpponentId(availableOpponent.id);
+    }
+  }, [state?.players, state?.phase, me?.id, selectedOpponentId]);
 
   React.useEffect(() => {
     const lastLog = state?.log?.[state.log.length - 1];
@@ -125,7 +143,7 @@ export function App() {
 
   function handleStartGame() {
     if (!state) return;
-    emit("game:start", { code: state.code });
+    emit("game:start", { code: state.code, gameType, opponentPlayerId: selectedOpponentId });
   }
 
   async function copyRoomCode() {
@@ -192,8 +210,12 @@ export function App() {
   }
 
   function returnToMenu() {
-    disconnect();
-    setState(null);
+    if (state) {
+      emit("game:lobby");
+    } else {
+      disconnect();
+      setState(null);
+    }
     setError("");
     setActiveCardId(null);
   }
@@ -659,7 +681,7 @@ export function App() {
             <header style={styles.menuHeader}>
               <h1 style={styles.menuTitle}>Lobby</h1>
               <span style={styles.menuSubtitle}>
-                Room {state.code}. {lobbyGameTitle(state.gameType)}. En attente des joueurs.
+                Room {state.code}. Table permanente : choisis un mode et un adversaire, les autres restent spectateurs.
               </span>
             </header>
 
@@ -700,6 +722,64 @@ export function App() {
               )}
             </section>
 
+            <section style={styles.menuSection}>
+              <div style={styles.menuSectionTitle}>Mode de jeu</div>
+              {GAME_CHOICES.map((choice) => {
+                const isSelected = gameType === choice.id;
+                return (
+                  <button
+                    key={choice.id}
+                    className="menu-row"
+                    type="button"
+                    onClick={() => setGameType(choice.id)}
+                    disabled={!isHost}
+                    style={{
+                      ...styles.menuRow,
+                      ...styles.menuButtonRow,
+                      alignItems: isSelected ? "start" : styles.menuRow.alignItems,
+                      ...(isSelected ? styles.menuRowSelected : null)
+                    }}
+                  >
+                    <span style={{ ...styles.menuLabel, display: "grid", gap: 3 }}>
+                      <span>{choice.title}</span>
+                      {isSelected && <span style={styles.menuDescription}>{choice.desc}</span>}
+                    </span>
+                    <span style={styles.menuValue}>{isSelected ? "Choisi" : ""}</span>
+                  </button>
+                );
+              })}
+            </section>
+
+            <section style={styles.menuSection}>
+              <div style={styles.menuSectionTitle}>Adversaire</div>
+              {state.players.filter((player) => player.id !== me?.id).map((player) => {
+                const isSelected = selectedOpponentId === player.id;
+                return (
+                  <button
+                    key={player.id}
+                    className="menu-row"
+                    type="button"
+                    onClick={() => setSelectedOpponentId(player.id)}
+                    disabled={!isHost}
+                    style={{
+                      ...styles.menuRow,
+                      ...styles.menuButtonRow,
+                      ...(isSelected ? styles.menuRowSelected : null)
+                    }}
+                  >
+                    <span style={styles.menuLabel}>{player.name}</span>
+                    <span style={styles.menuValue}>{isSelected ? "Combat" : "Spectateur si non choisi"}</span>
+                  </button>
+                );
+              })}
+              {state.players.filter((player) => player.id !== me?.id).length === 0 && (
+                <div className="menu-row" style={{ ...styles.menuRow, color: "rgba(216, 201, 167, 0.48)" }}>
+                  <span style={styles.menuLabel}>Aucun adversaire</span>
+                  <span style={styles.menuValue}>En attente</span>
+                </div>
+              )}
+            </section>
+
             <section style={styles.menuActions}>
               <div style={styles.menuSectionTitle}>Actions</div>
               {isHost ? (
@@ -707,10 +787,10 @@ export function App() {
                   className="menu-row menu-action"
                   type="button"
                   onClick={handleStartGame}
-                  disabled={state.players.length < 2}
+                  disabled={state.players.length < 2 || !selectedOpponentId}
                   style={{ ...styles.menuRow, ...styles.menuButtonRow }}
                 >
-                  <span style={styles.menuLabel}>Démarrer</span>
+                  <span style={styles.menuLabel}>Démarrer {lobbyGameTitle(gameType)}</span>
                   <span style={styles.menuValue}>{state.players.length < 2 ? "Deux joueurs requis" : "Prêt"}</span>
                 </button>
               ) : (

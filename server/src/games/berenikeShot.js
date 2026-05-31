@@ -196,7 +196,7 @@ function applyItem(room, actor, item, payload = {}, { stolen = false } = {}) {
 
   if (item.type === "glass_eye") {
     const next = room.berenike.reserve[0];
-    actor.berenike.secrets.nextBullet = next?.type ?? null;
+    actor.berenike.secrets.nextBullet = next ? { id: uid("secret"), type: next.type } : null;
     room.log.push({ at: Date.now(), type: "berenike_item", message: `${label}.` });
     return;
   }
@@ -243,7 +243,7 @@ function applyItem(room, actor, item, payload = {}, { stolen = false } = {}) {
       throw new Error("Boule Magique ne fonctionne pas s'il ne reste qu'une balle.");
     }
     const index = randomInt(1, room.berenike.reserve.length - 1);
-    actor.berenike.secrets.futureBullet = { position: index + 1, type: room.berenike.reserve[index].type };
+    actor.berenike.secrets.futureBullet = { id: uid("secret"), position: index + 1, type: room.berenike.reserve[index].type };
     room.log.push({ at: Date.now(), type: "berenike_item", message: `${label}.` });
     return;
   }

@@ -38,9 +38,14 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
   const [rulesOpen, setRulesOpen] = React.useState(false);
   const [shotPopup, setShotPopup] = React.useState(null);
   const [cyclePopup, setCyclePopup] = React.useState(null);
+  const [itemPopup, setItemPopup] = React.useState(null);
+  const [visionPopup, setVisionPopup] = React.useState(null);
   const [hoveredPlayerId, setHoveredPlayerId] = React.useState(null);
   const previousShotIdRef = React.useRef(null);
   const previousCycleRef = React.useRef(null);
+  const previousItemLogRef = React.useRef(null);
+  const previousNextBulletRef = React.useRef(null);
+  const previousFutureBulletRef = React.useRef(null);
   const isCompactTable = isMobile || state.players.length > 4;
   const selectedItem = me?.berenike?.inventory?.find((item) => item.id === selectedItemId) ?? null;
   const currentPlayer = state.players.find((player) => player.id === state.turnPlayerId);
@@ -93,6 +98,48 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
     const timer = window.setTimeout(() => setCyclePopup(null), 1500);
     return () => window.clearTimeout(timer);
   }, [state.berenike?.cycle, state.berenike?.reserveCount, state.berenike?.publicCounts.real, state.berenike?.publicCounts.blank]);
+
+  React.useEffect(() => {
+    const lastLog = state.log?.[state.log.length - 1];
+    if (lastLog?.type !== "berenike_item") return;
+    const key = `${lastLog.at}-${lastLog.message}`;
+    if (previousItemLogRef.current === key) return;
+    previousItemLogRef.current = key;
+
+    setItemPopup({ id: key, message: lastLog.message });
+    const timer = window.setTimeout(() => setItemPopup(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [state.log]);
+
+  React.useEffect(() => {
+    const nextBullet = state.berenike?.secret?.nextBullet;
+    if (!nextBullet?.id || previousNextBulletRef.current === nextBullet.id) return;
+    previousNextBulletRef.current = nextBullet.id;
+
+    setVisionPopup({
+      id: nextBullet.id,
+      title: "Oeil de Verre",
+      detail: `Prochaine balle : ${bulletLabel(nextBullet.type)}.`,
+      bulletType: nextBullet.type
+    });
+    const timer = window.setTimeout(() => setVisionPopup(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [state.berenike?.secret?.nextBullet?.id]);
+
+  React.useEffect(() => {
+    const futureBullet = state.berenike?.secret?.futureBullet;
+    if (!futureBullet?.id || previousFutureBulletRef.current === futureBullet.id) return;
+    previousFutureBulletRef.current = futureBullet.id;
+
+    setVisionPopup({
+      id: futureBullet.id,
+      title: "Boule Magique",
+      detail: `Balle ${futureBullet.position} : ${bulletLabel(futureBullet.type)}.`,
+      bulletType: futureBullet.type
+    });
+    const timer = window.setTimeout(() => setVisionPopup(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [state.berenike?.secret?.futureBullet?.id]);
 
   function useItem(item, targetPlayer = null) {
     if (!item || !isMyTurn) return;
@@ -292,6 +339,20 @@ export function BerenikeShotView({ state, me, isMobile, isMobilePortrait, emit, 
             <span style={{ display: "inline-block", width: 10 }} />
             <span style={bulletDotStyle("blank")} /> {cyclePopup.blank} factice(s)
           </span>
+        </div>
+      )}
+
+      {itemPopup && (
+        <div style={itemPopupStyle}>
+          <strong>Consommable utilisé</strong>
+          <span>{itemPopup.message}</span>
+        </div>
+      )}
+
+      {visionPopup && (
+        <div style={visionPopupStyle(visionPopup.bulletType)}>
+          <strong>{visionPopup.title}</strong>
+          <span>{visionPopup.detail}</span>
         </div>
       )}
 
@@ -504,6 +565,49 @@ const cyclePopupStyle = {
   animation: "berenike-popup-in 100ms ease-out both",
   pointerEvents: "none"
 };
+
+const itemPopupStyle = {
+  position: "fixed",
+  left: "50%",
+  top: 92,
+  transform: "translateX(-50%)",
+  zIndex: 64,
+  width: "min(88vw, 360px)",
+  display: "grid",
+  justifyItems: "center",
+  gap: 5,
+  padding: "11px 13px",
+  borderRadius: 4,
+  border: "1px solid rgba(216,201,167,0.45)",
+  background: "#15100c",
+  color: "#fff0c9",
+  textAlign: "center",
+  fontSize: 13,
+  boxShadow: "none",
+  animation: "berenike-popup-in 100ms ease-out both",
+  pointerEvents: "none"
+};
+
+const visionPopupStyle = (bulletType) => ({
+  position: "fixed",
+  left: "50%",
+  top: "28%",
+  transform: "translateX(-50%)",
+  zIndex: 76,
+  width: "min(88vw, 320px)",
+  display: "grid",
+  justifyItems: "center",
+  gap: 7,
+  padding: "14px 16px",
+  borderRadius: 4,
+  border: bulletType === "real" ? "1px solid #c24134" : "1px solid #d7d2c6",
+  background: "#15100c",
+  color: "#fff0c9",
+  textAlign: "center",
+  boxShadow: "none",
+  animation: "berenike-popup-in 100ms ease-out both",
+  pointerEvents: "none"
+});
 
 const globalInventoryPopupStyle = {
   position: "fixed",

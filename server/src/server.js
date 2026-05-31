@@ -17,6 +17,7 @@ import {
   playTwentyOneTrump,
   replayGame,
   resolveDefense,
+  returnToLobby,
   rooms,
   standTwentyOne,
   startGame,
@@ -41,7 +42,8 @@ function emitRoomState(code) {
   const room = rooms.get(code);
   if (!room) return;
 
-  for (const player of room.players) {
+  const roomPlayers = room.allPlayers ?? room.players;
+  for (const player of roomPlayers) {
     io.to(player.socketId).emit("room:state", getVisibleState(room, player.id));
   }
   for (const spectator of room.spectators ?? []) {
@@ -89,11 +91,11 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("game:start", ({ code }) => {
+  socket.on("game:start", ({ code, gameType, opponentPlayerId }) => {
     try {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
-      startGame(code, ref.playerId);
+      startGame(code, ref.playerId, { gameType, opponentPlayerId });
       emitRoomState(code);
     } catch (err) {
       onError(socket, err);
@@ -162,6 +164,17 @@ io.on("connection", (socket) => {
       const ref = playersBySocketId.get(socket.id);
       if (!ref) throw new Error("Joueur inconnu.");
       standTwentyOne(ref.code, ref.playerId);
+      emitRoomState(ref.code);
+    } catch (err) {
+      onError(socket, err);
+    }
+  });
+
+  socket.on("game:lobby", () => {
+    try {
+      const ref = playersBySocketId.get(socket.id);
+      if (!ref) throw new Error("Joueur inconnu.");
+      returnToLobby(ref.code, ref.playerId);
       emitRoomState(ref.code);
     } catch (err) {
       onError(socket, err);

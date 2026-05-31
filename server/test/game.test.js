@@ -8,6 +8,8 @@ import {
   playersBySocketId,
   shootBerenikeShot,
   rooms,
+  playTwentyOneTrump,
+  returnToLobby,
   spectateRoom,
   standTwentyOne,
   startGame,
@@ -70,6 +72,27 @@ describe("room lifecycle", () => {
     assert.equal(room.players.length, 1);
     assert.equal(room.hostPlayerId, secondPlayer.id);
     assert.equal(playersBySocketId.has("socket-a"), false);
+  });
+
+  it("keeps a permanent room roster while a chosen duel is running", () => {
+    const room = createRoom("socket-a", "Alice", "card_duel");
+    joinRoom(room.code, "socket-b", "Bob");
+    joinRoom(room.code, "socket-c", "Chloe");
+    const host = room.players[0];
+    const opponent = room.players[1];
+    const inactive = room.players[2];
+
+    startGame(room.code, host.id, { gameType: "twenty_one", opponentPlayerId: opponent.id });
+
+    assert.equal(room.gameType, "twenty_one");
+    assert.deepEqual(room.players.map((player) => player.id), [host.id, opponent.id]);
+    assert.deepEqual(room.allPlayers.map((player) => player.id), [host.id, opponent.id, inactive.id]);
+    assert.equal(getVisibleState(room, inactive.id).viewerRole, "spectator");
+
+    returnToLobby(room.code, host.id);
+
+    assert.equal(room.phase, "lobby");
+    assert.deepEqual(room.players.map((player) => player.id), [host.id, opponent.id, inactive.id]);
   });
 });
 
@@ -170,6 +193,72 @@ describe("twenty one", () => {
     }
     assert.ok(room.players.every((player) => player.twentyOne.manualStand === false));
   });
+
+  it("requires a fresh stand chain after changing the target with a trump card", () => {
+    const room = createTwoPlayerRoom("twenty_one");
+    startGame(room.code, room.hostPlayerId);
+
+    const first = room.players[room.turnIndex % room.players.length];
+    standTwentyOne(room.code, first.id);
+    const second = room.players[room.turnIndex % room.players.length];
+    const targetCard = { id: "target-17", type: "trump", trumpType: "go_for", target: 17, name: "Cible 17" };
+    second.hand.push(targetCard);
+
+    playTwentyOneTrump(room.code, second.id, targetCard.id);
+    assert.equal(room.twentyOne.target, 17);
+    assert.equal(room.twentyOne.standStreak, 0);
+    assert.equal(first.twentyOne.manualStand, false);
+
+    standTwentyOne(room.code, second.id);
+    assert.equal(room.twentyOne.round, 1);
+    standTwentyOne(room.code, first.id);
+    assert.equal(room.twentyOne.round, 2);
+  });
+
+  it("requires a fresh stand chain after changing opponent number cards", () => {
+    const room = createTwoPlayerRoom("twenty_one");
+    startGame(room.code, room.hostPlayerId);
+
+    const first = room.players[room.turnIndex % room.players.length];
+    const startingOpponentCardCount = first.twentyOne.cards.length;
+    standTwentyOne(room.code, first.id);
+    const second = room.players[room.turnIndex % room.players.length];
+    const removeCard = { id: "remove-opponent", type: "trump", trumpType: "deck", action: "remove", name: "Retrait" };
+    second.hand.push(removeCard);
+
+    playTwentyOneTrump(room.code, second.id, removeCard.id);
+    assert.equal(first.twentyOne.cards.length, startingOpponentCardCount - 1);
+    assert.equal(room.twentyOne.standStreak, 0);
+    assert.equal(first.twentyOne.manualStand, false);
+
+    standTwentyOne(room.code, second.id);
+    assert.equal(room.twentyOne.round, 1);
+    standTwentyOne(room.code, first.id);
+    assert.equal(room.twentyOne.round, 2);
+  });
+
+  it("lets Alliance give two trump cards to each player", () => {
+    const room = createTwoPlayerRoom("twenty_one");
+    startGame(room.code, room.hostPlayerId);
+
+    const actor = room.players[room.turnIndex % room.players.length];
+    const opponent = room.players.find((player) => player.id !== actor.id);
+    const alliance = { id: "alliance", type: "trump", trumpType: "bet", action: "friendship", name: "Alliance" };
+    actor.hand = [alliance];
+    opponent.hand = [];
+    room.twentyOne.trumpDeck = [
+      { id: "trump-a", type: "trump", trumpType: "bet", action: "one_up", name: "Mise +1" },
+      { id: "trump-b", type: "trump", trumpType: "bet", action: "shield", name: "Bouclier" },
+      { id: "trump-c", type: "trump", trumpType: "deck", action: "return", name: "Retour" },
+      { id: "trump-d", type: "trump", trumpType: "deck", action: "remove", name: "Retrait" }
+    ];
+
+    playTwentyOneTrump(room.code, actor.id, alliance.id);
+
+    assert.equal(actor.hand.length, 2);
+    assert.equal(opponent.hand.length, 2);
+    assert.equal(room.twentyOne.trumpDeck.length, 0);
+  });
 });
 
 describe("berenike shot", () => {
@@ -223,5 +312,35 @@ describe("berenike shot", () => {
 
     assert.equal(target.berenike.hp, target.berenike.maxHp - 2);
     assert.equal(actor.berenike.powderArmed, false);
+  });
+
+  it("reveals bullet vision secrets only to the item user", () => {
+    const room = createTwoPlayerRoom("berenike_shot");
+    spectateRoom(room.code, "socket-s", "Sam");
+    startGame(room.code, room.hostPlayerId);
+    const actor = room.players[room.turnIndex % room.players.length];
+    const opponent = room.players.find((player) => player.id !== actor.id);
+    const glassEye = { id: "glass-eye", type: "glass_eye", name: "Oeil de Verre", icon: "◉", desc: "" };
+    const magicOrb = { id: "magic-orb", type: "magic_orb", name: "Boule Magique", icon: "●", desc: "" };
+    actor.berenike.inventory = [glassEye, magicOrb];
+    room.berenike.reserve = [{ id: "real", type: "real" }, { id: "blank", type: "blank" }];
+    room.berenike.publicCounts = { real: 1, blank: 1 };
+
+    useBerenikeItem(room.code, actor.id, { itemId: glassEye.id });
+    let visibleForActor = getVisibleState(room, actor.id);
+    let visibleForOpponent = getVisibleState(room, opponent.id);
+    let visibleForSpectator = getVisibleState(room, null);
+
+    assert.equal(visibleForActor.berenike.secret.nextBullet.type, "real");
+    assert.ok(visibleForActor.berenike.secret.nextBullet.id);
+    assert.deepEqual(visibleForOpponent.berenike.secret, {});
+    assert.deepEqual(visibleForSpectator.berenike.secret, {});
+
+    useBerenikeItem(room.code, actor.id, { itemId: magicOrb.id });
+    visibleForActor = getVisibleState(room, actor.id);
+
+    assert.equal(visibleForActor.berenike.secret.futureBullet.position, 2);
+    assert.equal(visibleForActor.berenike.secret.futureBullet.type, "blank");
+    assert.ok(visibleForActor.berenike.secret.futureBullet.id);
   });
 });

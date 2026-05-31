@@ -393,12 +393,14 @@ export function playTwentyOneTrump(code, playerId, cardId) {
 
   let consumed = true;
   let message = `${actor.name} joue ${card.name}.`;
+  let resetStandAfterTrump = false;
 
   if (card.trumpType === "add_number") {
     const drawn = drawTwentyOneNumber(room, actor, { value: card.value });
     message = drawn ? `${actor.name} joue ${card.name} et reçoit un ${card.value}.` : `${actor.name} joue ${card.name}, mais aucun ${card.value} n'est disponible.`;
   } else if (card.trumpType === "go_for") {
     room.twentyOne.target = card.target;
+    resetStandAfterTrump = true;
     message = `${actor.name} joue ${card.name} : la cible devient ${card.target}.`;
   } else if (card.trumpType === "bet") {
     if (card.action === "one_up") room.twentyOne.bet += 1;
@@ -412,7 +414,11 @@ export function playTwentyOneTrump(code, playerId, cardId) {
       consumed = Boolean(destroyLastOpponentTrump(room, actor, opponent));
       message = consumed ? message : `${actor.name} joue ${card.name}, mais aucune carte spéciale adverse ne peut être détruite.`;
     }
-    if (card.action === "friendship") message = `${actor.name} joue ${card.name}. Cette carte sert surtout à occuper ou déclencher les effets qui regardent la dernière carte spéciale jouée.`;
+    if (card.action === "friendship") {
+      const actorDrawn = drawTwentyOneTrump(room, actor, 2).length;
+      const opponentDrawn = drawTwentyOneTrump(room, opponent, 2).length;
+      message = `${actor.name} joue ${card.name} : chaque joueur reçoit 2 cartes spéciales (${actorDrawn} pour ${actor.name}, ${opponentDrawn} pour ${opponent.name}).`;
+    }
     if (card.action === "reincarnation") {
       consumed = Boolean(destroyLastOpponentTrump(room, actor, opponent));
       message = consumed ? `${actor.name} joue ${card.name} et annule la dernière carte spéciale adverse annulable.` : `${actor.name} joue ${card.name}, mais aucune carte spéciale adverse ne peut être annulée.`;
@@ -436,6 +442,7 @@ export function playTwentyOneTrump(code, playerId, cardId) {
     if (card.action === "remove") {
       const removed = opponent.twentyOne.cards.pop();
       if (removed) returnTwentyOneNumberCards(room, [removed]);
+      if (removed) resetStandAfterTrump = true;
       message = removed ? `${actor.name} joue ${card.name} et retire la dernière carte de ${opponent.name}.` : `${actor.name} joue ${card.name}, mais ${opponent.name} n'a pas de carte.`;
     }
     if (card.action === "return") {
@@ -449,6 +456,7 @@ export function playTwentyOneTrump(code, playerId, cardId) {
       if (own && other) {
         actor.twentyOne.cards.push({ ...other, hidden: false });
         opponent.twentyOne.cards.push({ ...own, hidden: false });
+        resetStandAfterTrump = true;
         message = `${actor.name} joue ${card.name} : les dernières cartes sont échangées et révélées.`;
       } else {
         if (own) actor.twentyOne.cards.push(own);
@@ -457,13 +465,15 @@ export function playTwentyOneTrump(code, playerId, cardId) {
       }
     }
     if (card.action === "disservice") {
-      drawTwentyOneNumber(room, opponent);
+      const drawn = drawTwentyOneNumber(room, opponent);
+      if (drawn) resetStandAfterTrump = true;
       message = `${actor.name} joue ${card.name} : ${opponent.name} pioche une carte visible de plus.`;
     }
   }
 
   actor.discard.push(card);
   if (consumed) actor.twentyOne.lastTrump = card;
+  if (resetStandAfterTrump) resetTwentyOneStandChain(room);
   room.log.push({ at: Date.now(), type: "twenty_one_trump", message, playerId: actor.id, card: { type: card.type, name: card.name, trumpType: card.trumpType, action: card.action, value: card.value, target: card.target } });
   refreshTwentyOneBustState(actor, room.twentyOne.target);
   refreshTwentyOneBustState(opponent, room.twentyOne.target);

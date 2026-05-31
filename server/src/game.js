@@ -26,6 +26,7 @@ export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
     createdAt: Date.now(),
     turnIndex: 0,
     players: [host],
+    allPlayers: [host],
     spectators: [],
     hostPlayerId: host.id,
     log: [{ at: Date.now(), type: "room_created", message: `${hostName} a créé la partie ${code}.` }],
@@ -43,15 +44,15 @@ export function createRoom(hostSocketId, hostName, gameType = "card_duel") {
 export function joinRoom(code, socketId, playerName) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
-  if (room.phase !== "lobby") throw new Error("Partie déjà démarrée.");
 
-  const maxPlayers = room.gameType === "berenike_shot" ? 8 : 2;
-  if (room.players.length >= maxPlayers) throw new Error("La room est pleine.");
+  room.allPlayers ??= room.players;
+  if (room.allPlayers.length >= 8) throw new Error("La room est pleine.");
 
-  const player = makePlayer(socketId, playerName, room.players.length);
-  room.players.push(player);
+  const player = makePlayer(socketId, playerName, room.allPlayers.length);
+  room.allPlayers.push(player);
+  if (room.phase === "lobby") room.players = room.allPlayers;
   playersBySocketId.set(socketId, { code, playerId: player.id });
-  room.log.push({ at: Date.now(), type: "player_joined", message: `${playerName} a rejoint.` });
+  room.log.push({ at: Date.now(), type: "player_joined", message: `${playerName} a rejoint la room permanente.` });
 
   return room;
 }
@@ -73,18 +74,34 @@ export function spectateRoom(code, socketId, spectatorName) {
   return room;
 }
 
-function validatePlayerCountForStart(room) {
+function validatePlayerCountForStart(room, activePlayers = room.players) {
   if (room.gameType === "berenike_shot") {
-    if (room.players.length < 2 || room.players.length > 8) throw new Error("Berenike Shot se joue de 2 à 8 joueurs.");
+    if (activePlayers.length < 2 || activePlayers.length > 8) throw new Error("Berenike Shot se joue de 2 à 8 joueurs.");
     return;
   }
-  if (room.players.length !== 2) throw new Error("Il faut 2 joueurs pour démarrer.");
+  if (activePlayers.length !== 2) throw new Error("Il faut 2 joueurs pour démarrer.");
 }
 
-export function startGame(code, requesterPlayerId) {
+function selectActivePlayers(room, requesterPlayerId, opponentPlayerId) {
+  room.allPlayers ??= room.players;
+  const host = room.allPlayers.find((player) => player.id === requesterPlayerId);
+  if (!host) throw new Error("Joueur introuvable.");
+  if (room.gameType === "berenike_shot" && !opponentPlayerId) {
+    return room.allPlayers.map((player, index) => ({ ...player, position: index, awaleSide: index }));
+  }
+  const fallbackOpponent = room.allPlayers.find((player) => player.id !== host.id);
+  const opponent = room.allPlayers.find((player) => player.id === opponentPlayerId) ?? fallbackOpponent;
+  if (!opponent || opponent.id === host.id) throw new Error("Choisissez un adversaire valide.");
+  return [host, opponent].map((player, index) => ({ ...player, position: index, awaleSide: index }));
+}
+
+export function startGame(code, requesterPlayerId, options = {}) {
   const room = rooms.get(code);
   if (!room) throw new Error("Room introuvable.");
   if (!requesterPlayerId || room.hostPlayerId !== requesterPlayerId) throw new Error("Seul l'hôte peut démarrer la partie.");
+  if (room.phase !== "lobby") throw new Error("Une partie est déjà en cours.");
+  room.gameType = normalizeGameType(options.gameType ?? room.gameType);
+  room.players = selectActivePlayers(room, requesterPlayerId, options.opponentPlayerId);
   validatePlayerCountForStart(room);
 
   room.turnIndex = Math.floor(Math.random() * room.players.length);
@@ -114,6 +131,25 @@ export function replayGame(code, requesterPlayerId) {
   if (room.gameType === "twenty_one") return startTwentyOneGame(room);
   if (room.gameType === "berenike_shot") return startBerenikeShotGame(room);
   return startCardDuelGame(room);
+}
+
+export function returnToLobby(code, requesterPlayerId) {
+  const room = rooms.get(code);
+  if (!room) throw new Error("Room introuvable.");
+  room.allPlayers ??= room.players;
+  if (!room.allPlayers.some((player) => player.id === requesterPlayerId)) {
+    throw new Error("Seuls les joueurs de la room peuvent revenir au menu.");
+  }
+
+  room.phase = "lobby";
+  room.players = room.allPlayers;
+  room.turnIndex = 0;
+  room.pendingAttack = null;
+  room.awale = null;
+  room.berenike = null;
+  room.twentyOne = null;
+  room.log.push({ at: Date.now(), type: "room_lobby", message: "Retour au menu de la room permanente." });
+  return room;
 }
 
 export function abortGame(code, playerId) {
@@ -269,12 +305,13 @@ export function leaveBySocket(socketId) {
     return ref.code;
   }
 
+  room.allPlayers = (room.allPlayers ?? room.players).filter((p) => p.id !== ref.playerId);
   room.players = room.players.filter((p) => p.id !== ref.playerId);
   if (room.hostPlayerId === ref.playerId) {
-    room.hostPlayerId = room.players[0]?.id ?? null;
+    room.hostPlayerId = room.allPlayers[0]?.id ?? null;
   }
   room.log.push({ at: Date.now(), type: "disconnect", message: "Un joueur a quitté la partie." });
 
-  if (!room.players.length) rooms.delete(ref.code);
+  if (!room.allPlayers.length) rooms.delete(ref.code);
   return ref.code;
 }

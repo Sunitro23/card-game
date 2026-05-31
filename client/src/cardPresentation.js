@@ -41,7 +41,7 @@ export function cardDetails(card) {
     if (card.action === "bless") return "Protection : si tu devais tomber à 0 vie cette manche, tu restes à 1 vie et la protection disparaît.";
     if (card.action === "bloodshed") return "Augmente la mise de 1. Aucun autre bonus de pioche spéciale n'est ajouté.";
     if (card.action === "destroy") return "Annule la dernière carte spéciale adverse annulable et retire son effet si possible.";
-    if (card.action === "friendship") return "Carte neutre : elle compte comme dernière carte spéciale jouée sans changer immédiatement la manche.";
+    if (card.action === "friendship") return "Chaque joueur reçoit 2 cartes spéciales, dans la limite de sa main.";
     if (card.action === "reincarnation") return "Annule la dernière carte spéciale adverse annulable, sans autre bonus de pioche spéciale.";
     if (card.action === "hush") return "Ajoute une carte cachée à ton total : toi seul vois sa valeur.";
     if (card.action === "perfect_draw") return "Ajoute la meilleure carte disponible qui rapproche ton total de la cible sans la dépasser.";
@@ -67,6 +67,7 @@ export function trumpShortEffect(card) {
   if (card.action === "shield") return "-1 mise";
   if (card.action === "bless") return "Sauve 1 vie";
   if (card.action === "destroy" || card.action === "reincarnation") return "Annule";
+  if (card.action === "friendship") return "+2 chacun";
   if (card.action === "hush") return "Ajout caché";
   if (card.action === "perfect_draw") return "Carte sûre";
   if (card.action === "refresh") return "Remet +2";
